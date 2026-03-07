@@ -16,6 +16,15 @@ The project combines:
 
 ---
 
+<img width="552" height="1262" alt="изображение" src="https://github.com/user-attachments/assets/0277582e-f815-4c57-baec-af17cfc311d3" />
+<img width="543" height="1182" alt="изображение" src="https://github.com/user-attachments/assets/7a32b657-100e-4200-8a27-a3fccbdef86b" />
+<img width="557" height="1199" alt="изображение" src="https://github.com/user-attachments/assets/fe5609a8-9ea9-4f5b-801a-c0ed1a7aaa68" />
+<img width="559" height="1193" alt="изображение" src="https://github.com/user-attachments/assets/88a76b8f-de94-41c5-87e5-bafd35e9e132" />
+<img width="556" height="1250" alt="изображение" src="https://github.com/user-attachments/assets/e1c5c895-83fe-473e-bc97-ac6a480a93d4" />
+<img width="569" height="1260" alt="изображение" src="https://github.com/user-attachments/assets/b2bcb43c-a9bd-40a1-87fc-643fcf50cf9c" />
+<img width="561" height="1259" alt="изображение" src="https://github.com/user-attachments/assets/f592e914-f175-4a6e-bacf-d9bb1f94d56f" />
+
+
 # ✨ Overview
 
 EcoScanner is designed as a game-like educational app where users interact with nature through a stylized interface and exploration flow.
@@ -49,11 +58,16 @@ The core gameplay loop is simple:
 - scan result screen
 - collection integration after successful scan
 
+<img width="543" height="1182" alt="изображение" src="https://github.com/user-attachments/assets/7a32b657-100e-4200-8a27-a3fccbdef86b" />
+<img width="557" height="1199" alt="изображение" src="https://github.com/user-attachments/assets/fe5609a8-9ea9-4f5b-801a-c0ed1a7aaa68" />
+
 ## 🌱 Collection System
 
 - scanned plants are stored in a personal collection
 - collectible gameplay loop
 - duplicate prevention through cooldown logic
+
+ <img width="559" height="1193" alt="изображение" src="https://github.com/user-attachments/assets/88a76b8f-de94-41c5-87e5-bafd35e9e132" />
 
 ## ⏱ Cooldown Mechanics
 
