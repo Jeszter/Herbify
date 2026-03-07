@@ -7,25 +7,25 @@ import java.net.URL
 import kotlin.math.*
 import kotlin.random.Random
 
-// ─── Биомные правила спавна ───────────────────────────────────────────────────
-// Overpass API (OpenStreetMap) запрашиваем теги местности и генерируем объекты
+// ─── Biome spawn rules ────────────────────────────────────────────────────────
+// Query Overpass API (OpenStreetMap) for terrain tags and generate objects
 
 object BiomeSpawner {
 
-    // Какие растения спавнятся в каком биоме
+    // Which plants spawn in which biome
     private val BIOME_PLANTS = mapOf(
-        Biome.FOREST  to listOf(3, 4, 8),       // Папоротник, Ель, Бамбук
-        Biome.MEADOW  to listOf(2, 5, 7, 10),    // Цикорий, Прострел, Подсолнух, Клевер
-        Biome.WETLAND to listOf(9, 10),           // Шиповник, Клевер
-        Biome.MOUNTAIN to listOf(6, 3),           // Гранит, Папоротник
-        Biome.URBAN   to listOf(2, 7, 10),        // Цикорий, Подсолнух, Клевер
-        Biome.COASTAL to listOf(9, 5)             // Шиповник, Прострел
+        Biome.FOREST  to listOf(3, 4, 8),
+        Biome.MEADOW  to listOf(2, 5, 7, 10),
+        Biome.WETLAND to listOf(9, 10),
+        Biome.MOUNTAIN to listOf(6, 3),
+        Biome.URBAN   to listOf(2, 7, 10),
+        Biome.COASTAL to listOf(9, 5)
     )
 
-    // Минимальное расстояние между объектами (метры)
+    // Minimum distance between objects (metres)
     private const val MIN_SPACING_M = 40.0
 
-    // ── Запрос биомов вокруг игрока через Overpass ───────────────────────────
+    // ── Query biomes near player via Overpass ─────────────────────────────
 
     suspend fun fetchBiomesNear(lat: Double, lon: Double, radiusM: Int = 500): List<BiomeArea> =
         withContext(Dispatchers.IO) {
@@ -49,7 +49,7 @@ object BiomeSpawner {
                 val json = URL(url).readText()
                 parseOverpassBiomes(json)
             } catch (_: Exception) {
-                // Fallback — возвращаем дефолтный биом
+                // Fallback — return default biome
                 listOf(BiomeArea(lat, lon, Biome.URBAN, 200.0))
             }
         }
@@ -82,7 +82,7 @@ object BiomeSpawner {
         return result
     }
 
-    // ── Генерация объектов на основе биомов ──────────────────────────────────
+    // ── Generate objects based on biomes ──────────────────────────────────
 
     fun spawnObjects(
         playerLat: Double,
@@ -94,7 +94,6 @@ object BiomeSpawner {
         val result  = mutableListOf<MapObject>()
         var idCounter = 200
 
-        // Биом в каждой точке или дефолт Urban
         fun biomeAt(lat: Double, lon: Double): Biome {
             val nearest = biomes.minByOrNull { distanceM(it.lat, it.lon, lat, lon) }
             return if (nearest != null && distanceM(nearest.lat, nearest.lon, lat, lon) < nearest.radiusM)
@@ -104,7 +103,6 @@ object BiomeSpawner {
         var attempts = 0
         while (result.size < count && attempts < count * 10) {
             attempts++
-            // Случайная точка в радиусе 50–400м от игрока
             val angle  = rng.nextDouble() * 2 * PI
             val dist   = rng.nextDouble() * 350 + 50
             val dLat   = (dist * cos(angle)) / 111_320.0
@@ -112,7 +110,6 @@ object BiomeSpawner {
             val lat    = playerLat + dLat
             val lon    = playerLon + dLon
 
-            // Проверяем минимальное расстояние между объектами
             val tooClose = result.any { distanceM(it.lat, it.lon, lat, lon) < MIN_SPACING_M }
             if (tooClose) continue
 
@@ -121,7 +118,6 @@ object BiomeSpawner {
             val plantId    = plantIds[rng.nextInt(plantIds.size)]
             val card       = PLANT_DATABASE.find { it.id == plantId } ?: PLANT_DATABASE.first()
 
-            // Редкость — шанс выше у Common, ниже у Legendary
             val rarity = rollRarity(rng)
             val finalCard = if (rarity != card.rarity) {
                 card.copy(rarity = rarity)
@@ -151,7 +147,7 @@ object BiomeSpawner {
     }
 }
 
-// ─── Вспомогательные типы ─────────────────────────────────────────────────────
+// ─── Helper types ─────────────────────────────────────────────────────────────
 
 data class BiomeArea(
     val lat: Double,
@@ -159,5 +155,3 @@ data class BiomeArea(
     val biome: Biome,
     val radiusM: Double
 )
-
-// EcoCard.copy нужен только если data class — он уже есть

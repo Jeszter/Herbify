@@ -1,7 +1,7 @@
 
-# 🌿 EcoScanner
+# 🌿 Herbify
 
-**EcoScanner** is an Android mobile application that turns discovering plants into an interactive exploration game.  
+**Herbify** is an Android mobile application that turns discovering plants into an interactive exploration game.  
 The player opens a map, finds nearby plants, scans them, builds a collection, earns **ECO tokens**, upgrades tools, and tracks progress through a profile system.
 
 The project combines:
@@ -18,7 +18,7 @@ The project combines:
 
 # ✨ Overview
 
-EcoScanner is designed as a game-like educational app where users interact with nature through a stylized interface and exploration flow.
+Herbify is designed as a game-like educational app where users interact with nature through a stylized interface and exploration flow.
 
 The core gameplay loop is simple:
 
@@ -149,7 +149,7 @@ The project uses a screen-based Compose architecture with centralized gameplay s
 ```
 MainActivity
       ↓
-EcoScannerApp
+HerbifyApp
       ↓
 MapScreen / ScannerScreen / CollectionScreen / ShopScreen / ProfileScreen
       ↓
@@ -235,7 +235,7 @@ app/
 
 # 🎨 UI / Design Direction
 
-EcoScanner follows a custom **dark eco / sci-fi visual style**.
+Herbify follows a custom **dark eco / sci-fi visual style**.
 
 ### Design characteristics
 

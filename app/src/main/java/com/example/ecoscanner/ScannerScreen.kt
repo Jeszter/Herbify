@@ -36,7 +36,7 @@ import com.example.ecoscanner.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// ─── Состояния сканера ────────────────────────────────────────────────────────
+// ─── Scanner states ───────────────────────────────────────────────────────────
 
 sealed class ScanState {
     object Idle       : ScanState()
@@ -65,7 +65,7 @@ fun ScannerScreen(
     var scanState by remember { mutableStateOf<ScanState>(ScanState.Idle) }
     var imageCaptureRef by remember { mutableStateOf<ImageCapture?>(null) }
 
-    // КД тикер
+    // CD ticker
     var tick by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { delay(1000); tick = System.currentTimeMillis() } }
 
@@ -73,7 +73,7 @@ fun ScannerScreen(
     val plantCd   = pendingObject?.let { GameState.plantCdRemaining(it.id) } ?: 0L
     val canScan   = scannerCd == 0L && plantCd == 0L
 
-    // Авто-скан (без камеры)
+    // Auto-scan (no camera)
     fun doAutoScan() {
         if (!canScan) return
         scope.launch {
@@ -91,7 +91,7 @@ fun ScannerScreen(
         }
     }
 
-    // Скан с камерой
+    // Camera scan
     fun doCameraScan(bitmap: Bitmap) {
         scope.launch {
             scanState = ScanState.Analyzing
@@ -106,7 +106,6 @@ fun ScannerScreen(
                     )
                 }
                 is PlantIdResponse.Error -> {
-                    // fallback на авто
                     val card = pendingObject?.toEcoCard() ?: PLANT_DATABASE.random()
                     ScanState.Result(card, 0.87f, emptyList())
                 }
@@ -114,7 +113,7 @@ fun ScannerScreen(
         }
     }
 
-    // Если авто-режим — сразу запускаем
+    // Auto-mode — start immediately
     LaunchedEffect(pendingObject) {
         if (pendingObject != null && !useCamera) {
             delay(300)
@@ -125,7 +124,7 @@ fun ScannerScreen(
     Column(
         Modifier.fillMaxSize().background(EcoBackground)
     ) {
-        // ── Шапка ──────────────────────────────────────────────────────────
+        // ── Header ─────────────────────────────────────────────────────────
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -137,7 +136,7 @@ fun ScannerScreen(
                     fontSize = 20.sp, fontWeight = FontWeight.Black, color = EcoGreen
                 )
                 Text(
-                    if (pendingObject != null) pendingObject.rarity.label else "AR · Сканер",
+                    if (pendingObject != null) pendingObject.rarity.label else "AR · Scanner",
                     fontSize = 10.sp,
                     color = pendingObject?.rarity?.color ?: EcoTextMuted,
                     fontFamily = FontFamily.Monospace
@@ -157,7 +156,7 @@ fun ScannerScreen(
             }
         }
 
-        // ── Камера ─────────────────────────────────────────────────────────
+        // ── Camera ─────────────────────────────────────────────────────────
         Box(
             Modifier
                 .fillMaxWidth()
@@ -194,25 +193,24 @@ fun ScannerScreen(
                     )
                 }
                 else -> {
-                    // Авто-режим / нет камеры
                     Box(Modifier.fillMaxSize().background(Color(0xFF061406)), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(pendingObject?.emoji ?: "🌿", fontSize = 72.sp)
                             if (scanState is ScanState.Analyzing) {
-                                Text("Анализирую...", color = EcoGreen, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
+                                Text("Analyzing...", color = EcoGreen, fontSize = 13.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
                 }
             }
 
-            // Угловые рамки
+            // Scan corners
             ScanCorners(
                 color    = pendingObject?.rarity?.color ?: EcoGreen,
                 scanning = scanState is ScanState.Analyzing
             )
 
-            // Подсказка
+            // Hint
             if (scanState is ScanState.Idle) {
                 Box(
                     Modifier
@@ -222,20 +220,20 @@ fun ScannerScreen(
                         .padding(horizontal = 16.dp, vertical = 7.dp)
                 ) {
                     Text(
-                        if (useCamera) "Наведите на растение"
-                        else "Нажмите Авто-скан",
+                        if (useCamera) "Point at the plant"
+                        else "Press Auto-Scan",
                         color = EcoTextPrimary, fontSize = 12.sp
                     )
                 }
             }
 
-            // Прогресс-бар анализа
+            // Analysis progress bar
             if (scanState is ScanState.Analyzing) {
                 AnalyzingBar(Modifier.align(Alignment.BottomCenter).padding(16.dp).fillMaxWidth())
             }
         }
 
-        // ── Plant.id строка результата ─────────────────────────────────────
+        // ── Plant.id result row ────────────────────────────────────────────
         AnimatedVisibility(
             visible = scanState is ScanState.Result,
             enter   = slideInVertically { it } + fadeIn()
@@ -255,14 +253,14 @@ fun ScannerScreen(
             }
         }
 
-        // ── КД / Кнопки ────────────────────────────────────────────────────
+        // ── CD / Buttons ───────────────────────────────────────────────────
         if (scanState !is ScanState.Result) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                // КД
+                // Cooldown
                 if (!canScan && scanState is ScanState.Idle) {
                     val (icon, text, clr) = when {
-                        plantCd > 0 -> Triple("🔒", "Уже отсканировано · КД: ${GameState.formatCd(plantCd)}", EcoRed)
-                        else        -> Triple("⏳", "Сканер на перезарядке · ${GameState.formatCd(scannerCd)}", EcoGold)
+                        plantCd > 0 -> Triple("🔒", "Already scanned · CD: ${GameState.formatCd(plantCd)}", EcoRed)
+                        else        -> Triple("⏳", "Scanner on cooldown · ${GameState.formatCd(scannerCd)}", EcoGold)
                     }
                     Row(
                         Modifier
@@ -279,10 +277,9 @@ fun ScannerScreen(
                     Spacer(Modifier.height(8.dp))
                 }
 
-                // Кнопки
+                // Buttons
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (useCamera) {
-                        // Камера → захват фото
                         Button(
                             onClick = {
                                 if (!canScan || scanState is ScanState.Analyzing) return@Button
@@ -310,15 +307,15 @@ fun ScannerScreen(
                         ) {
                             Text(
                                 when (scanState) {
-                                    is ScanState.Analyzing -> "⏳ Анализ..."
-                                    else -> if (canScan) "📷 Сфотографировать" else "🔒 Недоступно"
+                                    is ScanState.Analyzing -> "⏳ Analyzing..."
+                                    else -> if (canScan) "📷 Take Photo" else "🔒 Unavailable"
                                 },
                                 fontSize = 14.sp, fontWeight = FontWeight.Black
                             )
                         }
                     }
 
-                    // Авто-скан
+                    // Auto-scan
                     OutlinedButton(
                         onClick  = { doAutoScan() },
                         modifier = Modifier.height(52.dp).let { if (useCamera) it else it.fillMaxWidth() },
@@ -327,7 +324,7 @@ fun ScannerScreen(
                         border   = BorderStroke(1.dp, if (canScan) EcoBorder else Color(0xFF1A2A1A)),
                         colors   = ButtonDefaults.outlinedButtonColors(contentColor = EcoTextPrimary)
                     ) {
-                        Text("⚡ Авто", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("⚡ Auto", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -335,7 +332,7 @@ fun ScannerScreen(
     }
 }
 
-// ─── Углы сканера ─────────────────────────────────────────────────────────────
+// ─── Scanner corners ──────────────────────────────────────────────────────────
 
 @Composable
 fun ScanCorners(color: Color, scanning: Boolean) {
@@ -357,7 +354,7 @@ fun ScanCorners(color: Color, scanning: Boolean) {
         corner(l, t, 1f, 1f); corner(r, t, -1f, 1f)
         corner(l, b, 1f, -1f); corner(r, b, -1f, -1f)
 
-        // Скан-линия
+        // Scan line
         if (scanning) {
             val sy = t + (b - t) * scanY
             drawLine(c.copy(alpha = 0.7f), Offset(l, sy), Offset(r, sy), strokeWidth = 2.dp.toPx())
@@ -365,7 +362,7 @@ fun ScanCorners(color: Color, scanning: Boolean) {
     }
 }
 
-// ─── Полоса анализа ───────────────────────────────────────────────────────────
+// ─── Analysis bar ─────────────────────────────────────────────────────────────
 
 @Composable
 fun AnalyzingBar(modifier: Modifier) {
@@ -382,7 +379,7 @@ fun AnalyzingBar(modifier: Modifier) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(7.dp).background(EcoGreen, CircleShape))
-                Text("Plant.id · Анализ завершён", color = EcoGreen, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                Text("Plant.id · Analysis complete", color = EcoGreen, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
             }
             Text("${(progress * 100).toInt()}%", color = EcoGold, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
         }
@@ -395,7 +392,7 @@ fun AnalyzingBar(modifier: Modifier) {
     }
 }
 
-// ─── Plant.id панель результата (как на Image 4) ──────────────────────────────
+// ─── Plant.id result panel ────────────────────────────────────────────────────
 
 @Composable
 fun PlantIdResultPanel(
@@ -416,7 +413,7 @@ fun PlantIdResultPanel(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
     ) {
-        // Plant.id строка
+        // Plant.id status row
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -424,9 +421,9 @@ fun PlantIdResultPanel(
         ) {
             Box(Modifier.size(8.dp).background(EcoGreen, CircleShape))
             Text("Plant.id", color = EcoGreen, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-            Text("·  Анализ завершён  ·  ${pct}% уверен", color = EcoGreen, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+            Text("·  Analysis complete  ·  ${pct}% confidence", color = EcoGreen, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
         }
-        // Прогресс уверенности
+        // Confidence progress
         LinearProgressIndicator(
             progress  = confidence,
             modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(3.dp).clip(RoundedCornerShape(2.dp)),
@@ -434,7 +431,7 @@ fun PlantIdResultPanel(
         )
         Spacer(Modifier.height(8.dp))
 
-        // Основная карточка результата
+        // Main result card
         Card(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             shape  = RoundedCornerShape(18.dp),
@@ -467,21 +464,21 @@ fun PlantIdResultPanel(
                     }
                 }
 
-                // Теги
+                // Tags
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    InfoTag("🌿 Покрытосеменные")
-                    InfoTag("📏 10–30 см")
-                    if (card.rarity == Rarity.EPIC || card.rarity == Rarity.LEGENDARY) InfoTag("⚠️ Краснокнижный")
+                    InfoTag("🌿 Angiosperms")
+                    InfoTag("📏 10–30 cm")
+                    if (card.rarity == Rarity.EPIC || card.rarity == Rarity.LEGENDARY) InfoTag("⚠️ Endangered")
                 }
 
                 Text(card.description, fontSize = 11.sp, color = EcoTextMuted, lineHeight = 16.sp)
             }
         }
 
-        // Альтернативы
+        // Alternatives
         if (alternatives.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
-            Text("ДРУГИЕ ВАРИАНТЫ", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace,
+            Text("OTHER SUGGESTIONS", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(horizontal = 16.dp), letterSpacing = 1.sp)
             Spacer(Modifier.height(6.dp))
             alternatives.take(2).forEach { (name, prob) ->
@@ -505,14 +502,14 @@ fun PlantIdResultPanel(
 
         Spacer(Modifier.height(10.dp))
 
-        // Кнопка "В коллекцию"
+        // "Add to Collection" button
         Button(
             onClick  = onCollect,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(52.dp),
             shape    = RoundedCornerShape(14.dp),
             colors   = ButtonDefaults.buttonColors(containerColor = EcoGreenDark, contentColor = EcoBackground)
         ) {
-            Text("🃏  Добавить в коллекцию  +${card.rarity.multiplier} ECO", fontSize = 14.sp, fontWeight = FontWeight.Black)
+            Text("🃏  Add to Collection  +${card.rarity.multiplier} ECO", fontSize = 14.sp, fontWeight = FontWeight.Black)
         }
         Spacer(Modifier.height(12.dp))
     }

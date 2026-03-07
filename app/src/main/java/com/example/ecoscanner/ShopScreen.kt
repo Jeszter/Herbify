@@ -21,10 +21,10 @@ import com.example.ecoscanner.ui.theme.*
 @Composable
 fun ShopScreen() {
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Апгрейды", "Бустеры", "Скины")
+    val tabs = listOf("Upgrades", "Boosters", "Skins")
 
     Column(Modifier.fillMaxSize().background(EcoBackground)) {
-        // ── Шапка ──────────────────────────────────────────────────────────
+        // ── Header ─────────────────────────────────────────────────────────
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -32,7 +32,7 @@ fun ShopScreen() {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("🛒", fontSize = 22.sp)
-                Text("Магазин", fontSize = 24.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
+                Text("Shop", fontSize = 24.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
             }
             Box(
                 Modifier.background(EcoGold.copy(.12f), RoundedCornerShape(12.dp))
@@ -47,7 +47,7 @@ fun ShopScreen() {
             }
         }
 
-        // ── Табы ──────────────────────────────────────────────────────────
+        // ── Tabs ──────────────────────────────────────────────────────────
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -106,13 +106,12 @@ fun UpgradeRow(upgrade: UpgradeItem) {
     val nextLevel = if (!isMaxed) upgrade.levels[currentLevel] else null
     val canAfford = nextLevel != null && GameState.ecoBalance >= nextLevel.cost
 
-    // Тег в правом верхнем углу
     val tagText = when {
-        isMaxed -> "✓ Макс."
-        upgrade.id == "scanner_cd" -> "−${(nextLevel?.effectValue ?: 0) / 1000}с КД"
-        upgrade.id == "ai_accuracy" -> "+${nextLevel?.effectValue ?: 0}% точн."
-        upgrade.id == "backpack"   -> "+${nextLevel?.effectValue ?: 0} слотов"
-        upgrade.id == "radar"      -> "${200 + (nextLevel?.effectValue ?: 0).toInt()}м радиус"
+        isMaxed -> "✓ Max"
+        upgrade.id == "scanner_cd" -> "−${(nextLevel?.effectValue ?: 0) / 1000}s CD"
+        upgrade.id == "ai_accuracy" -> "+${nextLevel?.effectValue ?: 0}% acc."
+        upgrade.id == "backpack"   -> "+${nextLevel?.effectValue ?: 0} slots"
+        upgrade.id == "radar"      -> "${200 + (nextLevel?.effectValue ?: 0).toInt()} m radius"
         else -> "+${nextLevel?.effectValue ?: 0}%"
     }
     val tagColor = when {
@@ -129,13 +128,11 @@ fun UpgradeRow(upgrade: UpgradeItem) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Иконка
         Box(
             Modifier.size(52.dp).background(EcoGreenDim.copy(.3f), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center
         ) { Text(upgrade.emoji, fontSize = 24.sp) }
 
-        // Текст
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(upgrade.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
             Text(
@@ -143,7 +140,6 @@ fun UpgradeRow(upgrade: UpgradeItem) {
                 fontSize = 10.sp, color = EcoTextMuted, lineHeight = 14.sp
             )
             Spacer(Modifier.height(2.dp))
-            // Точки уровня
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 repeat(upgrade.maxLevel) { i ->
                     Box(
@@ -157,9 +153,7 @@ fun UpgradeRow(upgrade: UpgradeItem) {
             }
         }
 
-        // Правая сторона
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Тег эффекта
             Box(
                 Modifier.background(tagColor.copy(.15f), RoundedCornerShape(8.dp))
                     .border(1.dp, tagColor.copy(.4f), RoundedCornerShape(8.dp))
@@ -167,12 +161,10 @@ fun UpgradeRow(upgrade: UpgradeItem) {
             ) { Text(tagText, fontSize = 9.sp, color = tagColor, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) }
 
             if (!isMaxed) {
-                // Цена
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("🪙", fontSize = 12.sp)
                     Text("${nextLevel!!.cost}", fontSize = 13.sp, color = EcoGold, fontWeight = FontWeight.Bold)
                 }
-                // Кнопка
                 Button(
                     onClick = {
                         if (GameState.buyUpgrade(upgrade.id))
@@ -188,7 +180,7 @@ fun UpgradeRow(upgrade: UpgradeItem) {
                     )
                 ) {
                     Text(
-                        if (canAfford) "Купить" else "Мало ECO",
+                        if (canAfford) "Buy" else "Not enough",
                         fontSize = 11.sp, fontWeight = FontWeight.Bold
                     )
                 }
@@ -205,17 +197,17 @@ fun BoostersTab() {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            ProfileSectionLabel("АКТИВНЫЕ БУСТЕРЫ")
+            ProfileSectionLabel("ACTIVE BOOSTERS")
             Spacer(Modifier.height(8.dp))
             val active = SHOP_BOOSTERS.filter { GameState.isBoosterActive(it.id) }
             if (active.isEmpty()) {
                 Box(
                     Modifier.fillMaxWidth().background(EcoSurface, RoundedCornerShape(14.dp))
                         .border(1.dp, EcoBorder, RoundedCornerShape(14.dp)).padding(16.dp)
-                ) { Text("Сейчас нет активных бустеров", fontSize = 11.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace) }
+                ) { Text("No active boosters right now", fontSize = 11.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace) }
             }
             Spacer(Modifier.height(14.dp))
-            ProfileSectionLabel("ПОКУПКА БУСТЕРОВ")
+            ProfileSectionLabel("BUY BOOSTERS")
             Spacer(Modifier.height(8.dp))
         }
         items(SHOP_BOOSTERS) { b -> BoosterRow(b) }
@@ -253,7 +245,7 @@ fun BoosterRow(booster: BoosterItem) {
                     containerColor = EcoGreenDark, contentColor = EcoBackground,
                     disabledContainerColor = EcoSurface, disabledContentColor = EcoTextMuted
                 )
-            ) { Text("Купить", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+            ) { Text("Buy", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -264,7 +256,7 @@ fun SkinsTab() {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text("🎨", fontSize = 48.sp)
             Spacer(Modifier.height(8.dp))
-            Text("Скины — скоро!", fontSize = 16.sp, color = EcoTextMuted)
+            Text("Skins — coming soon!", fontSize = 16.sp, color = EcoTextMuted)
         }
     }
 }

@@ -38,7 +38,7 @@ fun ProfileScreen(onOpenEvents: () -> Unit, onOpenWallet: () -> Unit) {
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("🌿", fontSize = 11.sp)
-                Text("ЭКО-НАТУРАЛИСТ  ·  ТОП 142", fontSize = 11.sp, color = EcoGreen,
+                Text("ECO-NATURALIST  ·  TOP 142", fontSize = 11.sp, color = EcoGreen,
                     fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
             }
             Spacer(Modifier.height(10.dp))
@@ -49,13 +49,13 @@ fun ProfileScreen(onOpenEvents: () -> Unit, onOpenWallet: () -> Unit) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("⭐", fontSize = 13.sp)
-                    Text("Уровень ${GameState.level}  ·  ${GameState.levelTitle}", fontSize = 12.sp,
+                    Text("Level ${GameState.level}  ·  ${GameState.levelTitle}", fontSize = 12.sp,
                         color = EcoGold, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("ХР до Уровня ${GameState.level + 1}", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                Text("XP to Level ${GameState.level + 1}", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
                 Text("${GameState.xpForCurrent} / 2000", fontSize = 10.sp, color = EcoGreen,
                     fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
@@ -68,38 +68,38 @@ fun ProfileScreen(onOpenEvents: () -> Unit, onOpenWallet: () -> Unit) {
             Spacer(Modifier.height(24.dp))
         }
 
-        // ── Быстрый доступ ────────────────────────────────────────────────
+        // ── Quick access ──────────────────────────────────────────────────
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ProfileNavCard(
                     modifier  = Modifier.weight(1f),
                     emoji     = "🪙",
-                    title     = "Кошелёк",
+                    title     = "Wallet",
                     subtitle  = "${GameState.ecoBalance} ECO",
                     onClick   = onOpenWallet
                 )
                 ProfileNavCard(
                     modifier  = Modifier.weight(1f),
                     emoji     = "🌍",
-                    title     = "Ивенты",
-                    subtitle  = "2 активных",
+                    title     = "Events",
+                    subtitle  = "2 active",
                     onClick   = onOpenEvents
                 )
             }
             Spacer(Modifier.height(24.dp))
         }
 
-        // ── Ежедневный стрик ─────────────────────────────────────────────────
+        // ── Daily streak ──────────────────────────────────────────────────
         item {
-            ProfileSectionLabel("ЕЖЕДНЕВНЫЙ СТРИК")
+            ProfileSectionLabel("DAILY STREAK")
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StreakCard(Modifier.weight(1f), "🔥", "${GameState.streak}", "Дней подряд", Color(0xFFFF8C00))
-                StreakCard(Modifier.weight(1f), null, "×${"%.1f".format(GameState.streakMultiplier)}", "Бонус токенов", EcoGreen)
-                StreakCard(Modifier.weight(1f), null, "${GameState.ecoBalance}", "ECO всего", EcoGold)
+                StreakCard(Modifier.weight(1f), "🔥", "${GameState.streak}", "Days in a row", Color(0xFFFF8C00))
+                StreakCard(Modifier.weight(1f), null, "×${"%.1f".format(GameState.streakMultiplier)}", "Token bonus", EcoGreen)
+                StreakCard(Modifier.weight(1f), null, "${GameState.ecoBalance}", "ECO total", EcoGold)
             }
             Spacer(Modifier.height(10.dp))
-            val days = listOf("Пн","Вт","Ср","Чт","Пт","Сб","Вс")
+            val days = listOf("Mon","Tue","Wed","Thu","Fri","Sat","Sun")
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 days.forEachIndexed { i, d ->
                     val active = i == 6
@@ -118,9 +118,9 @@ fun ProfileScreen(onOpenEvents: () -> Unit, onOpenWallet: () -> Unit) {
             Spacer(Modifier.height(24.dp))
         }
 
-        // ── Квесты ────────────────────────────────────────────────────────────
+        // ── Quests ────────────────────────────────────────────────────────────
         item {
-            ProfileSectionLabel("ДНЕВНЫЕ КВЕСТЫ")
+            ProfileSectionLabel("DAILY QUESTS")
             Spacer(Modifier.height(12.dp))
         }
         items(DAILY_QUESTS) { quest ->
@@ -164,7 +164,7 @@ fun QuestRow(quest: DailyQuest) {
             Text(quest.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
             Spacer(Modifier.height(3.dp))
             Text(
-                if (done) "Выполнено ✓" else "$progress / ${quest.target} выполнено",
+                if (done) "Completed ✓" else "$progress / ${quest.target} done",
                 fontSize = 10.sp, color = if (done) EcoGreen else EcoTextMuted, fontFamily = FontFamily.Monospace
             )
             Spacer(Modifier.height(6.dp))
@@ -187,7 +187,7 @@ fun ProfileSectionLabel(text: String) {
     }
 }
 
-// ── Карточка-ссылка на другой экран ──────────────────────────────────────────
+// ── Navigation card to another screen ────────────────────────────────────────
 
 @Composable
 fun ProfileNavCard(modifier: Modifier, emoji: String, title: String, subtitle: String, onClick: () -> Unit) {

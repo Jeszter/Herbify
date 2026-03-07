@@ -58,16 +58,16 @@ data class EcoCard(
 )
 
 val PLANT_DATABASE = listOf(
-    EcoCard(1,  "🌿", "Папоротник орляк",   "Pteridium aquilinum",  Rarity.RARE,      "Один из самых распространённых папоротников. Образует плотные заросли в хвойных лесах."),
-    EcoCard(2,  "🌸", "Цикорий обыкновенный","Cichorium intybus",   Rarity.COMMON,    "Синие цветы вдоль дорог. Корень используют как заменитель кофе."),
-    EcoCard(3,  "🍄", "Мухомор красный",     "Amanita muscaria",    Rarity.LEGENDARY, "Ядовитый гриб с красной шляпкой. Легендарный символ леса."),
-    EcoCard(4,  "🌲", "Ель обыкновенная",    "Picea abies",         Rarity.COMMON,    "Хвойное дерево, основа таёжных лесов Европы."),
-    EcoCard(5,  "🌺", "Прострел луговой",    "Pulsatilla pratensis",Rarity.EPIC,      "Редкий весенний цветок. Занесён в Красную книгу."),
-    EcoCard(6,  "🪨", "Гранит",              "Granite",             Rarity.RARE,      "Самая твёрдая магматическая порода. Возраст до 3 млрд лет."),
-    EcoCard(7,  "🌻", "Подсолнух",           "Helianthus annuus",   Rarity.COMMON,    "Следует за солнцем. Семена богаты витамином E."),
-    EcoCard(8,  "🎋", "Бамбук обыкновенный", "Phyllostachys edulis",Rarity.EPIC,      "Самое быстрорастущее растение — до 90 см в сутки."),
-    EcoCard(9,  "🌹", "Шиповник майский",    "Rosa majalis",        Rarity.RARE,      "Плоды содержат витамина C в 50 раз больше, чем лимон."),
-    EcoCard(10, "🍀", "Клевер луговой",      "Trifolium pratense",  Rarity.COMMON,    "Фиксирует азот из воздуха, обогащая почву.")
+    EcoCard(1,  "🌿", "Bracken Fern",        "Pteridium aquilinum",  Rarity.RARE,      "One of the most widespread ferns. Forms dense thickets in conifer forests."),
+    EcoCard(2,  "🌸", "Common Chicory",       "Cichorium intybus",    Rarity.COMMON,    "Blue flowers along roadsides. The root is used as a coffee substitute."),
+    EcoCard(3,  "🍄", "Fly Agaric",           "Amanita muscaria",     Rarity.LEGENDARY, "Poisonous mushroom with a red cap. A legendary symbol of the forest."),
+    EcoCard(4,  "🌲", "Norway Spruce",        "Picea abies",          Rarity.COMMON,    "Coniferous tree — the backbone of European taiga forests."),
+    EcoCard(5,  "🌺", "Pasque Flower",        "Pulsatilla pratensis", Rarity.EPIC,      "A rare spring flower. Listed in the Red Book of endangered species."),
+    EcoCard(6,  "🪨", "Granite",              "Granite",              Rarity.RARE,      "The hardest igneous rock. Age up to 3 billion years."),
+    EcoCard(7,  "🌻", "Common Sunflower",     "Helianthus annuus",    Rarity.COMMON,    "Follows the sun. Seeds are rich in vitamin E."),
+    EcoCard(8,  "🎋", "Moso Bamboo",          "Phyllostachys edulis", Rarity.EPIC,      "The fastest-growing plant — up to 90 cm per day."),
+    EcoCard(9,  "🌹", "May Rose",             "Rosa majalis",         Rarity.RARE,      "Its fruits contain 50× more vitamin C than lemons."),
+    EcoCard(10, "🍀", "Red Clover",           "Trifolium pratense",   Rarity.COMMON,    "Fixes nitrogen from the air, enriching the soil.")
 )
 
 // ─── Activity ────────────────────────────────────────────────────────────────
@@ -158,11 +158,11 @@ fun EcoScannerApp() {
 @Composable
 fun EcoBottomNav(current: String, onSelect: (String) -> Unit, modifier: Modifier = Modifier) {
     val items = listOf(
-        Triple("map",        "🗺️", "Карта"),
-        Triple("scanner",    "📷", "Сканер"),
-        Triple("collection", "🃏", "Карты"),
-        Triple("shop",       "🛒", "Магазин"),
-        Triple("profile",    "👤", "Профиль"),
+        Triple("map",        "🗺️", "Map"),
+        Triple("scanner",    "📷", "Scanner"),
+        Triple("collection", "🃏", "Cards"),
+        Triple("shop",       "🛒", "Shop"),
+        Triple("profile",    "👤", "Profile"),
     )
     Surface(
         modifier  = modifier.fillMaxWidth(),
@@ -248,7 +248,7 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) {
 }
 
 
-// ScannerScreen вынесен в ScannerScreen.kt
+// ScannerScreen is in ScannerScreen.kt
 
 // ─── Reward Overlay ───────────────────────────────────────────────────────────
 
@@ -332,7 +332,7 @@ fun RewardOverlay(card: EcoCard, onDismiss: () -> Unit) {
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text("+${card.rarity.multiplier} ECO", fontSize = 18.sp, fontWeight = FontWeight.Black, color = EcoGold)
-                            Text("${card.rarity.label} · ×${card.rarity.multiplier} бонус", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                            Text("${card.rarity.label} · ×${card.rarity.multiplier} bonus", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -342,7 +342,7 @@ fun RewardOverlay(card: EcoCard, onDismiss: () -> Unit) {
                         shape  = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = EcoGreenDark, contentColor = EcoBackground)
                     ) {
-                        Text("Добавить в коллекцию", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                        Text("Add to Collection", fontWeight = FontWeight.Black, fontSize = 14.sp)
                     }
                 }
             }
@@ -365,16 +365,16 @@ fun CollectionScreen(collection: List<EcoCard>, balance: Int) {
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(16.dp))
-        Text("Коллекция", fontSize = 26.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
-        Text("${collection.size} / ${PLANT_DATABASE.size} карточек", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+        Text("Collection", fontSize = 26.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
+        Text("${collection.size} / ${PLANT_DATABASE.size} cards", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
         Spacer(Modifier.height(12.dp))
 
         // Stats row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val statsData = listOf(
-                Triple(collection.size.toString(), "Собрано", EcoGreen),
-                Triple(collection.count { it.rarity == Rarity.RARE || it.rarity == Rarity.EPIC }.toString(), "Редких", EcoBlue),
-                Triple(collection.count { it.rarity == Rarity.LEGENDARY }.toString(), "Легенд.", EcoGold),
+                Triple(collection.size.toString(), "Collected", EcoGreen),
+                Triple(collection.count { it.rarity == Rarity.RARE || it.rarity == Rarity.EPIC }.toString(), "Rare", EcoBlue),
+                Triple(collection.count { it.rarity == Rarity.LEGENDARY }.toString(), "Legend.", EcoGold),
                 Triple("$balance", "ECO", EcoGold)
             )
             statsData.forEach { (value, label, color) ->
@@ -399,7 +399,7 @@ fun CollectionScreen(collection: List<EcoCard>, balance: Int) {
         // Filter tabs
         LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             item {
-                FilterChip(filter == null, "Все") { filter = null }
+                FilterChip(filter == null, "All") { filter = null }
             }
             items(rarities) { r ->
                 FilterChip(filter == r, r.label) { filter = if (filter == r) null else r }
@@ -478,12 +478,12 @@ data class TxItem(val icon: String, val name: String, val amount: String, val is
 @Composable
 fun WalletScreen(balance: Int) {
     val transactions = listOf(
-        TxItem("🌿", "Папоротник орляк",    "+3 ECO",  true),
-        TxItem("🌍", "Ивент-бонус",          "+10 ECO", true),
-        TxItem("🃏", "Обмен карточки",       "-5 ECO",  false),
-        TxItem("🍄", "Мухомор (легенд.)",    "+10 ECO", true),
-        TxItem("🌸", "Цикорий обыкновенный", "+1 ECO",  true),
-        TxItem("🪨", "Гранит Rare",          "+3 ECO",  true),
+        TxItem("🌿", "Bracken Fern",       "+3 ECO",  true),
+        TxItem("🌍", "Event Bonus",         "+10 ECO", true),
+        TxItem("🃏", "Card Exchange",       "-5 ECO",  false),
+        TxItem("🍄", "Fly Agaric (legend.)","  +10 ECO", true),
+        TxItem("🌸", "Common Chicory",      "+1 ECO",  true),
+        TxItem("🪨", "Granite Rare",        "+3 ECO",  true),
     )
 
     LazyColumn(
@@ -492,7 +492,7 @@ fun WalletScreen(balance: Int) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item { Spacer(Modifier.height(4.dp)) }
-        item { Text("Кошелёк", fontSize = 26.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary) }
+        item { Text("Wallet", fontSize = 26.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary) }
 
         // Balance card
         item {
@@ -538,7 +538,7 @@ fun WalletScreen(balance: Int) {
         // Action buttons
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("📤" to "Вывести", "🔄" to "Обменять", "🛒" to "В игре", "📊" to "История").forEach { (icon, label) ->
+                listOf("📤" to "Withdraw", "🔄" to "Exchange", "🛒" to "In-Game", "📊" to "History").forEach { (icon, label) ->
                     Card(
                         modifier = Modifier.weight(1f),
                         shape    = RoundedCornerShape(12.dp),
@@ -559,7 +559,7 @@ fun WalletScreen(balance: Int) {
         }
 
         // Transactions header
-        item { SectionLabel("Транзакции") }
+        item { SectionLabel("Transactions") }
 
         // Transactions
         items(transactions) { tx ->
@@ -581,7 +581,7 @@ fun WalletScreen(balance: Int) {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(name, fontSize = 13.sp, color = EcoTextPrimary)
-                    Text("Сегодня", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                    Text("Today", fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
                 }
                 Text(amount, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                     color = if (isPlus) EcoGreen else EcoRed)

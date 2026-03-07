@@ -1,12 +1,12 @@
 package com.example.ecoscanner
 
-// ─── Добавить в app/build.gradle (секция dependencies) ───────────────────────
+// ─── Add to app/build.gradle (dependencies section) ──────────────────────────
 //
 //   implementation("com.squareup.okhttp3:okhttp:4.12.0")
 //   implementation("com.google.code.gson:gson:2.10.1")
 //   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
 //
-// Добавить в AndroidManifest.xml (перед тегом <application>):
+// Add to AndroidManifest.xml (before the <application> tag):
 //   <uses-permission android:name="android.permission.INTERNET"/>
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ sealed class PlantIdResponse {
 
 object PlantIdService {
 
-    // Ключ: https://plant.id/ — бесплатный тир: 100 запросов/день
+    // Key: https://plant.id/ — free tier: 100 requests/day
     private const val API_KEY         = "YOUR_PLANT_ID_API_KEY"
     private const val API_URL         = "https://api.plant.id/v3/identification"
     private const val MIN_CONFIDENCE  = 0.20f
@@ -70,7 +70,7 @@ object PlantIdService {
 
     private val gson = Gson()
 
-    // ── Основной вызов (suspend — вызывать из корутины) ───────────────────────
+    // ── Main call (suspend — call from a coroutine) ───────────────────────
 
     suspend fun identify(bitmap: Bitmap): PlantIdResponse = withContext(Dispatchers.IO) {
         try {
@@ -100,7 +100,7 @@ object PlantIdService {
 
             val json = response.body?.string()
                 ?: return@withContext PlantIdResponse.Error(
-                    PlantIdError.ApiError("Пустой ответ сервера")
+                    PlantIdError.ApiError("Empty server response")
                 )
 
             parseResponse(json)
@@ -108,11 +108,11 @@ object PlantIdService {
         } catch (e: java.net.UnknownHostException) {
             PlantIdResponse.Error(PlantIdError.NoInternet)
         } catch (e: Exception) {
-            PlantIdResponse.Error(PlantIdError.ApiError(e.message ?: "Неизвестная ошибка"))
+            PlantIdResponse.Error(PlantIdError.ApiError(e.message ?: "Unknown error"))
         }
     }
 
-    // ── Парсинг ───────────────────────────────────────────────────────────────
+    // ── Parsing ───────────────────────────────────────────────────────────
 
     @Suppress("UNCHECKED_CAST")
     private fun parseResponse(json: String): PlantIdResponse {
@@ -127,7 +127,7 @@ object PlantIdService {
             val classiMap   = resultMap?.get("classification") as? Map<String, Any>
             val suggestions = (classiMap?.get("suggestions") as? List<*>)
                 ?.filterIsInstance<Map<String, Any>>()
-                ?: return PlantIdResponse.Error(PlantIdError.ApiError("Нет результатов"))
+                ?: return PlantIdResponse.Error(PlantIdError.ApiError("No results"))
 
             val matches = suggestions.mapNotNull { s ->
                 try {
@@ -138,7 +138,7 @@ object PlantIdService {
                     val taxonomy    = details?.get("taxonomy") as? Map<String, Any>
 
                     PlantMatch(
-                        name        = (s["name"] as? String) ?: "Неизвестно",
+                        name        = (s["name"] as? String) ?: "Unknown",
                         latinName   = (details?.get("name_authority") as? String) ?: "",
                         probability = probability,
                         description = (descMap?.get("value") as? String) ?: "",
@@ -149,7 +149,7 @@ object PlantIdService {
             }
 
             if (matches.isEmpty()) {
-                return PlantIdResponse.Error(PlantIdError.ApiError("Не удалось распознать"))
+                return PlantIdResponse.Error(PlantIdError.ApiError("Could not identify"))
             }
 
             val top = matches.first()
@@ -168,37 +168,37 @@ object PlantIdService {
             )
 
         } catch (e: Exception) {
-            PlantIdResponse.Error(PlantIdError.ApiError("Ошибка парсинга: ${e.message}"))
+            PlantIdResponse.Error(PlantIdError.ApiError("Parse error: ${e.message}"))
         }
     }
 
-    // ── Матчинг с базой карточек ──────────────────────────────────────────────
+    // ── Match to card database ────────────────────────────────────────────
 
     fun matchToCard(match: PlantMatch): EcoCard? {
         val latinLower = match.latinName.lowercase()
         val nameLower  = match.name.lowercase()
 
-        // 1. По латинскому названию
+        // 1. By Latin name
         PLANT_DATABASE.firstOrNull { card ->
             val cl = card.latin.lowercase()
             latinLower.contains(cl) || cl.contains(latinLower)
         }?.let { return it }
 
-        // 2. По русскому/общему названию (слова длиннее 4 символов)
+        // 2. By common name (words longer than 4 characters)
         PLANT_DATABASE.firstOrNull { card ->
             card.name.split(" ").any { word ->
                 word.length > 4 && nameLower.contains(word.lowercase())
             }
         }?.let { return it }
 
-        // 3. Создаём карточку на лету
+        // 3. Create a card on the fly
         return EcoCard(
             id          = match.name.hashCode().and(0x7FFFFFFF),
             emoji       = "🌿",
             name        = match.name,
             latin       = match.latinName,
             rarity      = rarityFromConfidence(match.probability),
-            description = match.description.take(200).ifBlank { "Новый вид в твоей коллекции!" }
+            description = match.description.take(200).ifBlank { "New species in your collection!" }
         )
     }
 
@@ -209,7 +209,7 @@ object PlantIdService {
         else                -> Rarity.COMMON
     }
 
-    // ── Утилиты ───────────────────────────────────────────────────────────────
+    // ── Utilities ─────────────────────────────────────────────────────────
 
     private fun bitmapToBase64(bitmap: Bitmap): String {
         val out    = ByteArrayOutputStream()

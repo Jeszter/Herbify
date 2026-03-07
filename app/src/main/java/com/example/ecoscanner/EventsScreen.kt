@@ -28,13 +28,13 @@ data class GameEvent(
 )
 
 val GAME_EVENTS = listOf(
-    GameEvent("spring", "🔥", "Весеннее цветение",
-        "Copernicus зафиксировал массовое цветение в Карпатах. Сканируй весенние цветы до 15 апреля — ×10 токены!",
-        "Карпаты", 8, 10, communityProgress = 0.62f, isFeatured = true),
-    GameEvent("volcanic", "🌋", "Вулканические минералы", "", "Камчатка", 8, 5),
-    GameEvent("seaweed",  "🐟", "Прибрежные водоросли",  "", "Глобальное", 3, 3),
-    GameEvent("mushroom", "🍄", "Осенние грибы",         "", "Сибирь",     12, 4),
-    GameEvent("arctic",   "❄️", "Арктический мох",       "", "Арктика",    20, 6),
+    GameEvent("spring", "🔥", "Spring Bloom",
+        "Copernicus detected a mass bloom in the Carpathians. Scan spring flowers before April 15 — ×10 tokens!",
+        "Carpathians", 8, 10, communityProgress = 0.62f, isFeatured = true),
+    GameEvent("volcanic", "🌋", "Volcanic Minerals",    "", "Kamchatka",  8,  5),
+    GameEvent("seaweed",  "🐟", "Coastal Seaweed",      "", "Global",     3,  3),
+    GameEvent("mushroom", "🍄", "Autumn Mushrooms",     "", "Siberia",    12, 4),
+    GameEvent("arctic",   "❄️", "Arctic Moss",          "", "Arctic",     20, 6),
 )
 
 @Composable
@@ -43,7 +43,7 @@ fun EventsScreen() {
         Modifier.fillMaxSize().background(EcoBackground),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        // ── LIVE badge + заголовок ─────────────────────────────────────────
+        // ── LIVE badge + title ─────────────────────────────────────────────
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(
@@ -53,13 +53,13 @@ fun EventsScreen() {
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Box(Modifier.size(6.dp).background(Color(0xFFFF4444), CircleShape))
-                        Text("LIVE  ·  2 активных события", fontSize = 10.sp, color = Color(0xFFFF6666),
+                        Text("LIVE  ·  2 active events", fontSize = 10.sp, color = Color(0xFFFF6666),
                             fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     }
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("Ивенты", fontSize = 28.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
+            Text("Events", fontSize = 28.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary)
             Spacer(Modifier.height(16.dp))
         }
 
@@ -72,9 +72,9 @@ fun EventsScreen() {
             }
         }
 
-        // ── Все события ───────────────────────────────────────────────────
+        // ── All events ────────────────────────────────────────────────────
         item {
-            ProfileSectionLabel("ВСЕ СОБЫТИЯ")
+            ProfileSectionLabel("ALL EVENTS")
             Spacer(Modifier.height(12.dp))
         }
         items(GAME_EVENTS.filter { !it.isFeatured }) { ev ->
@@ -103,9 +103,9 @@ fun FeaturedEventCard(ev: GameEvent) {
             Text(ev.description, fontSize = 11.sp, color = EcoTextMuted, lineHeight = 16.sp)
             Spacer(Modifier.height(14.dp))
 
-            // Прогресс сообщества
+            // Community progress
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Text("Прогресс сообщества", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                Text("Community progress", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
                 Text("${(ev.communityProgress * 100).toInt()}%", fontSize = 11.sp,
                     color = EcoGreen, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
@@ -117,22 +117,22 @@ fun FeaturedEventCard(ev: GameEvent) {
             )
             Spacer(Modifier.height(14.dp))
 
-            // Награды
+            // Rewards
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RewardChip(Modifier.weight(1f), "🪙", "×${ev.multiplier} ECO")
-                RewardChip(Modifier.weight(1f), "🃏", "Лимит. карта")
-                RewardChip(Modifier.weight(1f), "🏆", "Ачивка")
+                RewardChip(Modifier.weight(1f), "🃏", "Ltd. Card")
+                RewardChip(Modifier.weight(1f), "🏆", "Achievement")
             }
             Spacer(Modifier.height(14.dp))
 
-            // Кнопка
+            // Button
             Button(
                 onClick = {},
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = EcoPurple.copy(.7f), contentColor = Color.White)
             ) {
-                Text("Участвовать  →", fontSize = 15.sp, fontWeight = FontWeight.Black)
+                Text("Participate  →", fontSize = 15.sp, fontWeight = FontWeight.Black)
             }
         }
     }
@@ -168,7 +168,7 @@ fun EventRow(ev: GameEvent) {
         ) { Text(ev.emoji, fontSize = 22.sp) }
         Column(Modifier.weight(1f)) {
             Text(ev.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
-            Text("${ev.location}  ·  ${ev.daysLeft} дней", fontSize = 10.sp,
+            Text("${ev.location}  ·  ${ev.daysLeft} days", fontSize = 10.sp,
                 color = EcoTextMuted, fontFamily = FontFamily.Monospace)
         }
         Box(

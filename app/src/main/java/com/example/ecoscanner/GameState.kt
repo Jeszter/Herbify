@@ -13,17 +13,17 @@ data class DailyQuest(
 )
 
 val DAILY_QUESTS = listOf(
-    DailyQuest("q_scan3",   "📷", "Просканируй 3 объекта",         3,  15),
-    DailyQuest("q_rare",    "⭐", "Найди Rare+ объект",            1,  25),
-    DailyQuest("q_walk",    "🚶", "Пройди 500м с открытым приложением", 500, 10),
-    DailyQuest("q_collect", "🃏", "Добавь 2 карточки в коллекцию", 2,  20)
+    DailyQuest("q_scan3",   "📷", "Scan 3 objects",                   3,   15),
+    DailyQuest("q_rare",    "⭐", "Find a Rare+ object",              1,   25),
+    DailyQuest("q_walk",    "🚶", "Walk 500 m with the app open",     500, 10),
+    DailyQuest("q_collect", "🃏", "Add 2 cards to your collection",   2,   20)
 )
 
 // ─── GameState ────────────────────────────────────────────────────────────────
 
 object GameState {
 
-    // ── Баланс и прогресс ─────────────────────────────────────────────────────
+    // ── Balance & progress ────────────────────────────────────────────────────
     var ecoBalance    by mutableStateOf(247)
     var totalXp       by mutableStateOf(1250)
     var streak        by mutableStateOf(3)
@@ -33,20 +33,20 @@ object GameState {
     val xpProgress     get() = xpForCurrent / 1000f
     val streakMultiplier get() = 1.0 + (streak * 0.05).coerceAtMost(0.5)
     val levelTitle     get() = when (level) {
-        1    -> "Новичок"
-        2    -> "Следопыт"
-        3    -> "Натуралист"
-        4    -> "Эколог"
-        5    -> "Ботаник"
-        else -> "Мастер природы"
+        1    -> "Beginner"
+        2    -> "Tracker"
+        3    -> "Naturalist"
+        4    -> "Ecologist"
+        5    -> "Botanist"
+        else -> "Master of Nature"
     }
 
-    // ── Коллекция ─────────────────────────────────────────────────────────────
+    // ── Collection ────────────────────────────────────────────────────────────
     var collection by mutableStateOf(
         listOf(PLANT_DATABASE[0], PLANT_DATABASE[1], PLANT_DATABASE[2])
     )
 
-    // ── Лимиты рюкзака (апгрейд backpack) ────────────────────────────────────
+    // ── Backpack capacity (backpack upgrade) ──────────────────────────────────
     val maxCollectionSlots get(): Int {
         val lvl = upgradeLevels["backpack"] ?: 0
         return when (lvl) {
@@ -54,7 +54,7 @@ object GameState {
         }
     }
 
-    // ── Радиус радара ─────────────────────────────────────────────────────────
+    // ── Radar radius ──────────────────────────────────────────────────────────
     val radarRadiusM get(): Int {
         val lvl = upgradeLevels["radar"] ?: 0
         return 200 + when (lvl) {
@@ -62,9 +62,8 @@ object GameState {
         }
     }
 
-    // ── Квесты ────────────────────────────────────────────────────────────────
+    // ── Quests ────────────────────────────────────────────────────────────────
     val questProgress   = mutableStateMapOf<String, Int>()
-    // mutableStateSetOf недоступен в этой версии — используем Map как Set
     val completedQuests = mutableStateMapOf<String, Boolean>()
 
     fun isQuestDone(id: String)         = completedQuests[id] == true
@@ -74,11 +73,10 @@ object GameState {
         return (current.toFloat() / quest.target).coerceIn(0f, 1f)
     }
 
-    // ── КД сканера ────────────────────────────────────────────────────────────
+    // ── Scanner cooldown ──────────────────────────────────────────────────────
     var lastScanTime by mutableStateOf(0L)
     val scannedPlants = mutableStateMapOf<Int, Long>()
 
-    // Базовый КД — уменьшается апгрейдом scanner_cd
     val SCANNER_CD_BASE_MS = 2 * 60 * 1000L
     val PLANT_CD_MS        = 24 * 60 * 60 * 1000L
 
@@ -108,13 +106,13 @@ object GameState {
         if (ms <= 0L) return ""
         val s = ms / 1000
         return when {
-            s >= 3600  -> "${s / 3600}ч ${(s % 3600) / 60}м"
-            s >= 60    -> "${s / 60}м ${s % 60}с"
-            else       -> "${s}с"
+            s >= 3600  -> "${s / 3600}h ${(s % 3600) / 60}m"
+            s >= 60    -> "${s / 60}m ${s % 60}s"
+            else       -> "${s}s"
         }
     }
 
-    // ── ECO бонус (апгрейд eco_bonus) ─────────────────────────────────────────
+    // ── ECO bonus (eco_bonus upgrade) ─────────────────────────────────────────
     val ecoMultiplier get(): Float {
         val lvl = upgradeLevels["eco_bonus"] ?: 0
         return when (lvl) {
@@ -122,7 +120,7 @@ object GameState {
         }
     }
 
-    // ── Активные бустеры (id -> expiry timestamp) ─────────────────────────────
+    // ── Active boosters (id -> expiry timestamp) ──────────────────────────────
     val activeBoosters = mutableStateMapOf<String, Long>()
 
     fun isBoosterActive(id: String): Boolean =
@@ -144,7 +142,7 @@ object GameState {
         return true
     }
 
-    // ── Апгрейды ──────────────────────────────────────────────────────────────
+    // ── Upgrades ──────────────────────────────────────────────────────────────
     val upgradeLevels = mutableStateMapOf<String, Int>()
 
     fun buyUpgrade(id: String): Boolean {
@@ -158,30 +156,25 @@ object GameState {
         return true
     }
 
-    // ── Запись скана ──────────────────────────────────────────────────────────
+    // ── Record scan ───────────────────────────────────────────────────────────
     fun recordScan(card: EcoCard) {
         lastScanTime = System.currentTimeMillis()
         scannedPlants[card.id] = System.currentTimeMillis()
 
-        // Награда с учётом множителей
         val baseReward = card.rarity.multiplier
         val doubleActive = isBoosterActive("double_eco")
         val reward = (baseReward * ecoMultiplier * if (doubleActive) 2f else 1f).toInt().coerceAtLeast(1)
         ecoBalance += reward
 
-        // XP
         val xpGain = baseReward * 10
         totalXp += xpGain
 
-        // Стрик
         streak++
 
-        // Коллекция
         if (collection.none { it.id == card.id }) {
             collection = collection + card
         }
 
-        // Квесты
         incrementQuest("q_scan3")
         incrementQuest("q_collect")
         if (card.rarity == Rarity.RARE || card.rarity == Rarity.EPIC || card.rarity == Rarity.LEGENDARY) {

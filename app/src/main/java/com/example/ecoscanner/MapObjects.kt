@@ -5,12 +5,12 @@ import kotlin.math.*
 // ─── Biome ────────────────────────────────────────────────────────────────────
 
 enum class Biome(val label: String, val emoji: String) {
-    FOREST  ("Лес",       "🌲"),
-    MEADOW  ("Луг",       "🌾"),
-    WETLAND ("Водоём",    "🌊"),
-    MOUNTAIN("Горы",      "⛰️"),
-    URBAN   ("Город",     "🏙️"),
-    COASTAL ("Побережье", "🏖️")
+    FOREST  ("Forest",    "🌲"),
+    MEADOW  ("Meadow",    "🌾"),
+    WETLAND ("Wetland",   "🌊"),
+    MOUNTAIN("Mountains", "⛰️"),
+    URBAN   ("Urban",     "🏙️"),
+    COASTAL ("Coastal",   "🏖️")
 }
 
 // ─── MapObject ────────────────────────────────────────────────────────────────
@@ -27,30 +27,28 @@ data class MapObject(
 ) {
     fun toEcoCard(): EcoCard =
         PLANT_DATABASE.firstOrNull { it.name == name }
-            ?: EcoCard(id, emoji, name, name, rarity, "Найдено в реальном мире (${biome.label})")
+            ?: EcoCard(id, emoji, name, name, rarity, "Found in the real world (${biome.label})")
 
     fun isOnCooldown(): Boolean = GameState.plantCdRemaining(id) > 0L
 }
 
-// ─── Repository (статика + динамика) ─────────────────────────────────────────
+// ─── Repository (static + dynamic) ───────────────────────────────────────────
 
 object MapObjectsRepository {
 
-    // Статические объекты (стартовые)
     val STATIC_OBJECTS: List<MapObject> = listOf(
-        MapObject(101, "🌺", "Прострел луговой",     Rarity.EPIC,      50.4501, 30.5241, biome = Biome.MEADOW),
-        MapObject(102, "🍄", "Мухомор красный",      Rarity.LEGENDARY, 50.4512, 30.5255, biome = Biome.FOREST),
-        MapObject(103, "🌿", "Папоротник орляк",     Rarity.RARE,      50.4495, 30.5230, biome = Biome.FOREST),
-        MapObject(104, "🪨", "Гранит",               Rarity.RARE,      50.4520, 30.5270, biome = Biome.MOUNTAIN),
-        MapObject(105, "🌲", "Ель обыкновенная",     Rarity.COMMON,    50.4480, 30.5215, biome = Biome.FOREST),
-        MapObject(106, "🌸", "Цикорий обыкновенный", Rarity.COMMON,    50.4530, 30.5200, biome = Biome.MEADOW),
-        MapObject(107, "🎋", "Бамбук обыкновенный",  Rarity.EPIC,      50.4468, 30.5280, biome = Biome.URBAN),
-        MapObject(108, "🌹", "Шиповник майский",     Rarity.RARE,      50.4545, 30.5240, biome = Biome.MEADOW),
-        MapObject(109, "🌻", "Подсолнух",            Rarity.COMMON,    50.4460, 30.5195, biome = Biome.MEADOW),
-        MapObject(110, "🍀", "Клевер луговой",       Rarity.COMMON,    50.4510, 30.5265, biome = Biome.MEADOW)
+        MapObject(101, "🌺", "Pasque Flower",    Rarity.EPIC,      50.4501, 30.5241, biome = Biome.MEADOW),
+        MapObject(102, "🍄", "Fly Agaric",       Rarity.LEGENDARY, 50.4512, 30.5255, biome = Biome.FOREST),
+        MapObject(103, "🌿", "Bracken Fern",      Rarity.RARE,      50.4495, 30.5230, biome = Biome.FOREST),
+        MapObject(104, "🪨", "Granite",           Rarity.RARE,      50.4520, 30.5270, biome = Biome.MOUNTAIN),
+        MapObject(105, "🌲", "Norway Spruce",     Rarity.COMMON,    50.4480, 30.5215, biome = Biome.FOREST),
+        MapObject(106, "🌸", "Common Chicory",    Rarity.COMMON,    50.4530, 30.5200, biome = Biome.MEADOW),
+        MapObject(107, "🎋", "Moso Bamboo",       Rarity.EPIC,      50.4468, 30.5280, biome = Biome.URBAN),
+        MapObject(108, "🌹", "May Rose",          Rarity.RARE,      50.4545, 30.5240, biome = Biome.MEADOW),
+        MapObject(109, "🌻", "Common Sunflower",  Rarity.COMMON,    50.4460, 30.5195, biome = Biome.MEADOW),
+        MapObject(110, "🍀", "Red Clover",        Rarity.COMMON,    50.4510, 30.5265, biome = Biome.MEADOW)
     )
 
-    // Динамические объекты (биомный спавн вокруг игрока)
     var dynamicObjects: List<MapObject> = emptyList()
         private set
 
@@ -68,7 +66,7 @@ object MapObjectsRepository {
 
     fun formatDistance(userLat: Double, userLon: Double, obj: MapObject): String {
         val m = distanceM(userLat, userLon, obj.lat, obj.lon).toInt()
-        return if (m >= 1000) "${"%.1f".format(m / 1000.0)} км" else "$m м"
+        return if (m >= 1000) "${"%.1f".format(m / 1000.0)} km" else "$m m"
     }
 }
 

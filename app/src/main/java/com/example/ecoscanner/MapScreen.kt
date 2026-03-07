@@ -40,7 +40,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-// ─── Тайл-сорс CartoDB Dark ───────────────────────────────────────────────────
+// ─── CartoDB Dark tile source ─────────────────────────────────────────────────
 
 fun darkMapTileSource() = object : XYTileSource(
     "CartoDB_DarkMatter", 0, 19, 256, ".png",
@@ -56,7 +56,7 @@ fun darkMapTileSource() = object : XYTileSource(
                 MapTileIndex.getY(pTileIndex) + mImageFilenameEnding
 }
 
-// ─── GeoPoint → пиксели на экране ────────────────────────────────────────────
+// ─── GeoPoint → screen pixels ────────────────────────────────────────────────
 
 fun MapView.geoToScreen(lat: Double, lon: Double): Offset? {
     return try {
@@ -83,17 +83,15 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
     var showScanChoice by remember { mutableStateOf(false) }
     var mapViewRef     by remember { mutableStateOf<MapView?>(null) }
 
-    // Тикер — перерисовываем маркеры каждые 100ms (плавно следят за картой)
     var tick by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { delay(100); tick++ } }
 
-    // КД тикер (раз в сек достаточно)
     var cdTick by remember { mutableStateOf(0L) }
     LaunchedEffect(Unit) { while (true) { delay(1000); cdTick = System.currentTimeMillis() } }
 
     val ecoObjects = MapObjectsRepository.ALL_MAP_OBJECTS
 
-    // Биомный спавн
+    // Biome spawn
     LaunchedEffect(userLat, userLng) {
         if (userLat == 50.4501 && userLng == 30.5234) return@LaunchedEffect
         val biomes  = BiomeSpawner.fetchBiomesNear(userLat, userLng)
@@ -131,7 +129,7 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
 
     Box(Modifier.fillMaxSize()) {
 
-        // ── OSMDroid MapView (только тайлы + GPS точка, без маркеров) ────────
+        // ── OSMDroid MapView ──────────────────────────────────────────────
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory  = { ctx ->
@@ -145,7 +143,6 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
                     zoomController.setVisibility(
                         org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
                     )
-                    // GPS синяя точка
                     if (hasLocation) {
                         val locOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
                         locOverlay.enableMyLocation()
@@ -170,17 +167,15 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
             }
         )
 
-        // ── Сетка-радар + маркеры через Compose Canvas ───────────────────────
-        // tick заставляет Canvas перерисовываться при скролле карты
+        // ── Radar grid + markers via Compose Canvas ───────────────────────
         val mv = mapViewRef
-        val tickVal = tick  // читаем чтобы Compose следил
+        val tickVal = tick
 
         Canvas(
             Modifier
                 .fillMaxSize()
                 .pointerInput(ecoObjects) {
                     detectTapGestures { tapOffset ->
-                        // Определяем нажатый маркер
                         val mapView = mapViewRef ?: return@detectTapGestures
                         val hitRadius = 44.dp.toPx() / 2
                         val hit = ecoObjects.firstOrNull { obj ->
@@ -191,14 +186,14 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
                     }
                 }
         ) {
-            // Сетка
+            // Grid
             val gridColor = Color(0x0A3DFF6E)
             var x = 0f
             while (x < size.width)  { drawLine(gridColor, Offset(x,0f), Offset(x,size.height), 1f); x += 80f }
             var y = 0f
             while (y < size.height) { drawLine(gridColor, Offset(0f,y), Offset(size.width,y), 1f); y += 80f }
 
-            // Маркеры
+            // Markers
             if (mv != null) {
                 ecoObjects.forEach { obj ->
                     val scr = mv.geoToScreen(obj.lat, obj.lon) ?: return@forEach
@@ -206,22 +201,15 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
                     val r   = if (isSelected) 28f else 22f
                     val rc  = obj.rarity.color
 
-                    // Свечение
                     drawCircle(rc.copy(alpha = if (isSelected) 0.25f else 0.12f), r + 8f, scr)
-                    // Фон
                     drawCircle(Color(0xF0080D08), r - 2f, scr)
-                    // Кольцо
                     drawCircle(rc.copy(alpha = if (isSelected) 1f else 0.7f), r - 2f, scr,
                         style = Stroke(width = if (isSelected) 3.5f else 2f))
-
-                    // Эмодзи рисуем через нативный Paint
-                    // (Canvas drawText не работает в Compose drawScope для эмодзи — пропустим,
-                    //  маркер и так виден по цвету редкости)
                 }
             }
         }
 
-        // ── Эмодзи маркеры — отдельный Composable слой (поверх Canvas) ───────
+        // ── Emoji markers layer ───────────────────────────────────────────
         if (mv != null) {
             val t = tick
             val density = androidx.compose.ui.platform.LocalDensity.current
@@ -253,7 +241,7 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
             }
         }
 
-        // ── Top Bar ──────────────────────────────────────────────────────────
+        // ── Top Bar ───────────────────────────────────────────────────────
         Column(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp)
         ) {
@@ -267,7 +255,7 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text("🔍", fontSize = 13.sp)
-                    Text("Поиск объектов...", color = EcoTextMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Text("Search objects...", color = EcoTextMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                 }
                 MapTopBtn("⚙️") {}
                 MapTopBtn("📍") {
@@ -276,7 +264,7 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
             }
         }
 
-        // ── Правые кнопки зума ────────────────────────────────────────────
+        // ── Zoom buttons ──────────────────────────────────────────────────
         Column(
             Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -285,7 +273,7 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
             MapTopBtn("−") { mapViewRef?.controller?.zoomOut() }
         }
 
-        // ── Диалог выбора сканирования ────────────────────────────────────
+        // ── Scan choice dialog ────────────────────────────────────────────
         AnimatedVisibility(
             visible = showScanChoice && selectedObject != null,
             enter   = fadeIn() + scaleIn(initialScale = 0.92f),
@@ -337,11 +325,11 @@ fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
     }
 }
 
-// ─── Утилита ─────────────────────────────────────────────────────────────────
+// ─── Utility ─────────────────────────────────────────────────────────────────
 
 private fun Offset.getDistance(): Float = kotlin.math.sqrt(x * x + y * y)
 
-// ─── Top Bar кнопка ───────────────────────────────────────────────────────────
+// ─── Top Bar button ───────────────────────────────────────────────────────────
 
 @Composable
 fun MapTopBtn(text: String, onClick: () -> Unit) {
@@ -354,7 +342,7 @@ fun MapTopBtn(text: String, onClick: () -> Unit) {
     ) { Text(text, fontSize = 18.sp, color = EcoTextPrimary) }
 }
 
-// ─── Диалог выбора ────────────────────────────────────────────────────────────
+// ─── Scan choice dialog ───────────────────────────────────────────────────────
 
 @Composable
 fun ScanChoiceDialog(obj: MapObject, onAutoScan: () -> Unit, onCameraScan: () -> Unit, onDismiss: () -> Unit) {
@@ -386,7 +374,7 @@ fun ScanChoiceDialog(obj: MapObject, onAutoScan: () -> Unit, onCameraScan: () ->
                     }
                 }
                 Box(Modifier.fillMaxWidth().height(1.dp).background(EcoBorder))
-                Text("Как сканировать?", fontSize = 11.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                Text("How do you want to scan?", fontSize = 11.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
 
                 Button(
                     onClick = onCameraScan,
@@ -395,8 +383,8 @@ fun ScanChoiceDialog(obj: MapObject, onAutoScan: () -> Unit, onCameraScan: () ->
                     colors = ButtonDefaults.buttonColors(containerColor = EcoGreenDark, contentColor = EcoBackground)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📷  Камера + Plant.id", fontSize = 14.sp, fontWeight = FontWeight.Black)
-                        Text("Сфотографируй растение → AI определит", fontSize = 9.sp, color = EcoBackground.copy(0.7f))
+                        Text("📷  Camera + Plant.id", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                        Text("Photograph the plant → AI will identify it", fontSize = 9.sp, color = EcoBackground.copy(0.7f))
                     }
                 }
 
@@ -408,12 +396,12 @@ fun ScanChoiceDialog(obj: MapObject, onAutoScan: () -> Unit, onCameraScan: () ->
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = EcoTextPrimary)
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("⚡  Авто-скан", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text("Получить карточку без камеры", fontSize = 9.sp, color = EcoTextMuted)
+                        Text("⚡  Auto-Scan", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Get the card without the camera", fontSize = 9.sp, color = EcoTextMuted)
                     }
                 }
 
-                Text("+${obj.rarity.multiplier} ECO за скан", fontSize = 10.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
+                Text("+${obj.rarity.multiplier} ECO per scan", fontSize = 10.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
             }
         }
     }
@@ -446,7 +434,7 @@ fun SelectedObjectCard(obj: MapObject, canScan: Boolean, scannerCdMs: Long, plan
                     Spacer(Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         RarityChip(obj.rarity)
-                        Text("📍 ${distM}м", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                        Text("📍 ${distM} m", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
                         Text("🪙 +${obj.rarity.multiplier}", fontSize = 10.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
                         Text(obj.biome.emoji, fontSize = 11.sp)
                     }
@@ -460,8 +448,8 @@ fun SelectedObjectCard(obj: MapObject, canScan: Boolean, scannerCdMs: Long, plan
             if (!canScan) {
                 Spacer(Modifier.height(10.dp))
                 val (icon, text, clr) = when {
-                    plantCdMs > 0 -> Triple("🔒", "Уже отсканировано · КД: ${GameState.formatCd(plantCdMs)}", EcoRed)
-                    else          -> Triple("⏳", "Сканер на перезарядке · ${GameState.formatCd(scannerCdMs)}", EcoGold)
+                    plantCdMs > 0 -> Triple("🔒", "Already scanned · CD: ${GameState.formatCd(plantCdMs)}", EcoRed)
+                    else          -> Triple("⏳", "Scanner on cooldown · ${GameState.formatCd(scannerCdMs)}", EcoGold)
                 }
                 Row(
                     Modifier.fillMaxWidth()
@@ -485,7 +473,7 @@ fun SelectedObjectCard(obj: MapObject, canScan: Boolean, scannerCdMs: Long, plan
                     disabledContainerColor = Color(0xFF1A2E1A), disabledContentColor = EcoTextMuted
                 )
             ) {
-                Text(if (canScan) "📷  Сканировать" else "🔒  Недоступно", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                Text(if (canScan) "📷  Scan" else "🔒  Unavailable", fontSize = 14.sp, fontWeight = FontWeight.Black)
             }
         }
     }
@@ -517,9 +505,9 @@ fun NearbyStrip(objects: List<MapObject>, selectedId: Int?, userLat: Double, use
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("⚡", fontSize = 12.sp)
-                Text("Объекты рядом", fontSize = 11.sp, color = EcoGreen, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("Nearby objects", fontSize = 11.sp, color = EcoGreen, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
-            Text("${objects.size} найдено", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+            Text("${objects.size} found", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
         }
         Spacer(Modifier.height(8.dp))
         Row(
@@ -559,8 +547,8 @@ fun NearbyChip(obj: MapObject, isSelected: Boolean, distM: Int, onCooldown: Bool
             Text(obj.name.split(" ").first(), fontSize = 11.sp,
                 color = if (onCooldown) EcoTextMuted else EcoTextPrimary, fontWeight = FontWeight.SemiBold)
             Text(
-                if (onCooldown) "КД ${GameState.formatCd(GameState.plantCdRemaining(obj.id))}"
-                else "${distM}м · ${obj.biome.emoji}",
+                if (onCooldown) "CD ${GameState.formatCd(GameState.plantCdRemaining(obj.id))}"
+                else "${distM} m · ${obj.biome.emoji}",
                 fontSize = 9.sp,
                 color = if (onCooldown) EcoRed.copy(alpha = 0.7f) else EcoTextMuted,
                 fontFamily = FontFamily.Monospace
