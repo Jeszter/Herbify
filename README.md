@@ -16,8 +16,7 @@ The project combines:
 
 ---
 
-<img width="552" height="1262" alt="изображение" src="https://github.com/user-attachments/assets/0277582e-f815-4c57-baec-af17cfc311d3" />
-
+<img src="https://github.com/user-attachments/assets/0277582e-f815-4c57-baec-af17cfc311d3" width="350">
 
 
 # ✨ Overview
