@@ -1,18 +1,14 @@
 package com.example.ecoscanner
 
-// ─── Добавить в app/build.gradle ─────────────────────────────────────────────
-//   implementation("com.google.android.gms:play-services-location:21.3.0")
-//   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-// ─────────────────────────────────────────────────────────────────────────────
-
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -20,514 +16,554 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.ecoscanner.ui.theme.*
+import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.delay
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.XYTileSource
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.util.MapTileIndex
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
-// ─── MapScreen ────────────────────────────────────────────────────────────────
+// ─── Тайл-сорс CartoDB Dark ───────────────────────────────────────────────────
 
-@Composable
-fun MapScreen(
-    onNavigateToScanner: (MapObject) -> Unit
+fun darkMapTileSource() = object : XYTileSource(
+    "CartoDB_DarkMatter", 0, 19, 256, ".png",
+    arrayOf(
+        "https://a.basemaps.cartocdn.com/dark_all/",
+        "https://b.basemaps.cartocdn.com/dark_all/",
+        "https://c.basemaps.cartocdn.com/dark_all/"
+    )
 ) {
-    val context = LocalContext.current
+    override fun getTileURLString(pTileIndex: Long) =
+        baseUrl + MapTileIndex.getZoom(pTileIndex) + "/" +
+                MapTileIndex.getX(pTileIndex) + "/" +
+                MapTileIndex.getY(pTileIndex) + mImageFilenameEnding
+}
 
-    var nearbyObjects   by remember { mutableStateOf<List<MapObject>>(MapObjectsRepository.ALL_MAP_OBJECTS) }
-    var selectedObject  by remember { mutableStateOf<MapObject?>(null) }
-    var filterRarity    by remember { mutableStateOf<Rarity?>(null) }
-    var filterBiome     by remember { mutableStateOf<Biome?>(null) }
-    var showFilters     by remember { mutableStateOf(false) }
+// ─── GeoPoint → пиксели на экране ────────────────────────────────────────────
 
-    // Фиктивные координаты для демо (замени на реальные из FusedLocationProviderClient)
-    val userLat = 50.4501
-    val userLon = 30.5241
+fun MapView.geoToScreen(lat: Double, lon: Double): Offset? {
+    return try {
+        val pt = projection?.toPixels(GeoPoint(lat, lon), null) ?: return null
+        Offset(pt.x.toFloat(), pt.y.toFloat())
+    } catch (_: Exception) { null }
+}
 
-    // КД тикер
-    var tick by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000L)
-            tick = System.currentTimeMillis()
-        }
-    }
+// ─── Map Screen ───────────────────────────────────────────────────────────────
+
+@SuppressLint("MissingPermission")
+@Composable
+fun MapScreen(onNavigateToScanner: (MapObject, Boolean) -> Unit) {
+    val context        = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val hasLocation = ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
-    // Фильтрованный список
-    val displayedObjects: List<MapObject> = remember(nearbyObjects, filterRarity, filterBiome, tick) {
-        nearbyObjects.filter { obj ->
-            (filterRarity == null || obj.rarity == filterRarity) &&
-                    (filterBiome  == null || obj.biome  == filterBiome)
+    var userLat        by remember { mutableStateOf(50.4501) }
+    var userLng        by remember { mutableStateOf(30.5234) }
+    var selectedObject by remember { mutableStateOf<MapObject?>(null) }
+    var showScanChoice by remember { mutableStateOf(false) }
+    var mapViewRef     by remember { mutableStateOf<MapView?>(null) }
+
+    // Тикер — перерисовываем маркеры каждые 100ms (плавно следят за картой)
+    var tick by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) { while (true) { delay(100); tick++ } }
+
+    // КД тикер (раз в сек достаточно)
+    var cdTick by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) { while (true) { delay(1000); cdTick = System.currentTimeMillis() } }
+
+    val ecoObjects = MapObjectsRepository.ALL_MAP_OBJECTS
+
+    // Биомный спавн
+    LaunchedEffect(userLat, userLng) {
+        if (userLat == 50.4501 && userLng == 30.5234) return@LaunchedEffect
+        val biomes  = BiomeSpawner.fetchBiomesNear(userLat, userLng)
+        val spawned = BiomeSpawner.spawnObjects(userLat, userLng, biomes, count = 14)
+        MapObjectsRepository.updateDynamic(spawned)
+    }
+
+    // GPS
+    LaunchedEffect(hasLocation) {
+        if (!hasLocation) return@LaunchedEffect
+        try {
+            LocationServices.getFusedLocationProviderClient(context)
+                .lastLocation.addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        userLat = loc.latitude
+                        userLng = loc.longitude
+                        mapViewRef?.controller?.animateTo(GeoPoint(loc.latitude, loc.longitude))
+                    }
+                }
+        } catch (_: Exception) {}
+    }
+
+    // Lifecycle
+    DisposableEffect(lifecycleOwner) {
+        val obs = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_RESUME -> mapViewRef?.onResume()
+                Lifecycle.Event.ON_PAUSE  -> mapViewRef?.onPause()
+                else -> {}
+            }
         }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
     }
 
-    val nearestScannable: MapObject? = remember(displayedObjects, tick) {
-        displayedObjects
-            .filter { !it.isOnCooldown() }
-            .minByOrNull { distanceM(userLat, userLon, it.lat, it.lon) }
-    }
+    Box(Modifier.fillMaxSize()) {
 
-    val epicCount      = displayedObjects.count { it.rarity == Rarity.EPIC      && !it.isOnCooldown() }
-    val legendaryCount = displayedObjects.count { it.rarity == Rarity.LEGENDARY && !it.isOnCooldown() }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(EcoBackground)
-    ) {
-        MapTopBar(
-            objectCount   = displayedObjects.size,
-            onFilterClick = { showFilters = !showFilters }
+        // ── OSMDroid MapView (только тайлы + GPS точка, без маркеров) ────────
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory  = { ctx ->
+                Configuration.getInstance().userAgentValue = ctx.packageName
+                MapView(ctx).apply {
+                    setTileSource(darkMapTileSource())
+                    setMultiTouchControls(true)
+                    isTilesScaledToDpi = true
+                    controller.setZoom(16.0)
+                    controller.setCenter(GeoPoint(userLat, userLng))
+                    zoomController.setVisibility(
+                        org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER
+                    )
+                    // GPS синяя точка
+                    if (hasLocation) {
+                        val locOverlay = MyLocationNewOverlay(GpsMyLocationProvider(ctx), this)
+                        locOverlay.enableMyLocation()
+                        val pb = android.graphics.Bitmap.createBitmap(40, 40, android.graphics.Bitmap.Config.ARGB_8888)
+                        val pc = android.graphics.Canvas(pb)
+                        pc.drawCircle(20f, 20f, 18f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.argb(50, 0, 200, 255)
+                        })
+                        pc.drawCircle(20f, 20f, 18f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.argb(180, 0, 200, 255)
+                            style = android.graphics.Paint.Style.STROKE; strokeWidth = 3f
+                        })
+                        pc.drawCircle(20f, 20f, 8f, android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                            color = android.graphics.Color.argb(255, 0, 230, 255)
+                        })
+                        locOverlay.setPersonIcon(pb)
+                        locOverlay.setDirectionArrow(pb, pb)
+                        overlays.add(locOverlay)
+                    }
+                    mapViewRef = this
+                }
+            }
         )
 
-        if (showFilters) {
-            MapFilters(
-                selectedRarity = filterRarity,
-                selectedBiome  = filterBiome,
-                onRaritySelect = { r -> filterRarity = if (filterRarity == r) null else r },
-                onBiomeSelect  = { b -> filterBiome  = if (filterBiome  == b) null else b }
-            )
-        }
+        // ── Сетка-радар + маркеры через Compose Canvas ───────────────────────
+        // tick заставляет Canvas перерисовываться при скролле карты
+        val mv = mapViewRef
+        val tickVal = tick  // читаем чтобы Compose следил
 
-        Box(modifier = Modifier
-            .fillMaxWidth()
-            .weight(1f)
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(ecoObjects) {
+                    detectTapGestures { tapOffset ->
+                        // Определяем нажатый маркер
+                        val mapView = mapViewRef ?: return@detectTapGestures
+                        val hitRadius = 44.dp.toPx() / 2
+                        val hit = ecoObjects.firstOrNull { obj ->
+                            val scr = mapView.geoToScreen(obj.lat, obj.lon) ?: return@firstOrNull false
+                            (tapOffset - scr).getDistance() < hitRadius
+                        }
+                        selectedObject = if (hit != null && selectedObject?.id == hit.id) null else hit
+                    }
+                }
         ) {
-            MapCanvas(
-                objects        = displayedObjects,
-                selectedId     = selectedObject?.id,
-                onObjectClick  = { obj ->
-                    selectedObject = if (selectedObject?.id == obj.id) null else obj
-                },
-                modifier       = Modifier.fillMaxSize()
-            )
-
-            MapStatsOverlay(
-                total     = displayedObjects.size,
-                epic      = epicCount,
-                legendary = legendaryCount,
-                modifier  = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-            )
-        }
-
-        // Нижняя панель
-        val sel = selectedObject
-        if (sel != null) {
-            MapObjectDetailCard(
-                obj      = sel,
-                userLat  = userLat,
-                userLon  = userLon,
-                tick     = tick,
-                onScan   = { onNavigateToScanner(it) },
-                onDismiss = { selectedObject = null }
-            )
-        } else if (nearestScannable != null) {
-            MapNearbyCard(
-                obj        = nearestScannable,
-                userLat    = userLat,
-                userLon    = userLon,
-                onNavigate = { onNavigateToScanner(it) }
-            )
-        }
-    }
-}
-
-// ─── Top Bar ──────────────────────────────────────────────────────────────────
-
-@Composable
-fun MapTopBar(objectCount: Int, onFilterClick: () -> Unit) {
-    Row(
-        modifier              = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Column {
-            Text("EcoScanner", fontSize = 20.sp, fontWeight = FontWeight.Black, color = EcoGreen)
-            Text(
-                "$objectCount объектов · ${GameState.radarRadiusM}м радар",
-                fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .background(EcoSurface, RoundedCornerShape(10.dp))
-                    .border(1.dp, EcoBorder, RoundedCornerShape(10.dp))
-                    .clickable(onClick = onFilterClick)
-                    .padding(horizontal = 12.dp, vertical = 7.dp)
-            ) {
-                Text("⚙️ Фильтр", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
-            }
-            Row(
-                modifier = Modifier
-                    .background(EcoRed.copy(alpha = 0.12f), RoundedCornerShape(10.dp))
-                    .border(1.dp, EcoRed.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                Box(Modifier.size(6.dp).background(EcoRed, CircleShape))
-                Text("LIVE", fontSize = 9.sp, color = EcoRed, fontFamily = FontFamily.Monospace)
-            }
-        }
-    }
-}
-
-// ─── Filters ──────────────────────────────────────────────────────────────────
-
-@Composable
-fun MapFilters(
-    selectedRarity: Rarity?,
-    selectedBiome: Biome?,
-    onRaritySelect: (Rarity) -> Unit,
-    onBiomeSelect: (Biome) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EcoSurface)
-            .border(1.dp, EcoBorder)
-            .padding(10.dp)
-    ) {
-        Text("РЕДКОСТЬ", fontSize = 8.sp, color = EcoTextMuted,
-            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
-        Spacer(Modifier.height(6.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(Rarity.values().toList()) { rarity ->
-                val selected = selectedRarity == rarity
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selected) rarity.color.copy(alpha = 0.2f) else EcoBackground)
-                        .border(1.dp, if (selected) rarity.color else EcoBorder, RoundedCornerShape(8.dp))
-                        .clickable { onRaritySelect(rarity) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text(rarity.label, fontSize = 9.sp,
-                        color = if (selected) rarity.color else EcoTextMuted,
-                        fontFamily = FontFamily.Monospace)
-                }
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text("БИОМ", fontSize = 8.sp, color = EcoTextMuted,
-            fontFamily = FontFamily.Monospace, letterSpacing = 2.sp)
-        Spacer(Modifier.height(6.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            items(Biome.values().toList()) { biome ->
-                val selected = selectedBiome == biome
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (selected) EcoGreenDim else EcoBackground)
-                        .border(1.dp, if (selected) EcoGreen else EcoBorder, RoundedCornerShape(8.dp))
-                        .clickable { onBiomeSelect(biome) }
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Text("${biome.emoji} ${biome.label}", fontSize = 9.sp,
-                        color = if (selected) EcoGreen else EcoTextMuted,
-                        fontFamily = FontFamily.Monospace)
-                }
-            }
-        }
-    }
-}
-
-// ─── Map Canvas (заглушка — замени на MapboxMap или GoogleMap) ────────────────
-
-@Composable
-fun MapCanvas(
-    objects: List<MapObject>,
-    selectedId: Int?,
-    onObjectClick: (MapObject) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "map")
-    val pingAlpha by infiniteTransition.animateFloat(
-        initialValue  = 0.8f,
-        targetValue   = 0.1f,
-        animationSpec = infiniteRepeatable(tween(1500), RepeatMode.Reverse),
-        label         = "ping"
-    )
-
-    BoxWithConstraints(modifier = modifier.background(Color(0xFF080D08))) {
-        val canvasW = maxWidth
-        val canvasH = maxHeight
-
-        // Фоновая сетка
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val step = 30.dp.toPx()
+            // Сетка
+            val gridColor = Color(0x0A3DFF6E)
             var x = 0f
-            while (x < size.width) {
-                drawLine(Color(0xFF1A3D24).copy(alpha = 0.4f), Offset(x, 0f), Offset(x, size.height), 1f)
-                x += step
-            }
+            while (x < size.width)  { drawLine(gridColor, Offset(x,0f), Offset(x,size.height), 1f); x += 80f }
             var y = 0f
-            while (y < size.height) {
-                drawLine(Color(0xFF1A3D24).copy(alpha = 0.4f), Offset(0f, y), Offset(size.width, y), 1f)
-                y += step
+            while (y < size.height) { drawLine(gridColor, Offset(0f,y), Offset(size.width,y), 1f); y += 80f }
+
+            // Маркеры
+            if (mv != null) {
+                ecoObjects.forEach { obj ->
+                    val scr = mv.geoToScreen(obj.lat, obj.lon) ?: return@forEach
+                    val isSelected = selectedObject?.id == obj.id
+                    val r   = if (isSelected) 28f else 22f
+                    val rc  = obj.rarity.color
+
+                    // Свечение
+                    drawCircle(rc.copy(alpha = if (isSelected) 0.25f else 0.12f), r + 8f, scr)
+                    // Фон
+                    drawCircle(Color(0xF0080D08), r - 2f, scr)
+                    // Кольцо
+                    drawCircle(rc.copy(alpha = if (isSelected) 1f else 0.7f), r - 2f, scr,
+                        style = Stroke(width = if (isSelected) 3.5f else 2f))
+
+                    // Эмодзи рисуем через нативный Paint
+                    // (Canvas drawText не работает в Compose drawScope для эмодзи — пропустим,
+                    //  маркер и так виден по цвету редкости)
+                }
             }
         }
 
-        // Маркеры объектов — равномерно по экрану
-        objects.forEachIndexed { index, obj ->
-            val col  = index % 3
-            val row  = index / 3
-            val offX = canvasW * (0.15f + col * 0.30f)
-            val offY = canvasH * (0.15f + row * 0.20f)
-
-            Box(
-                modifier = Modifier
-                    .offset(x = offX - 20.dp, y = offY - 20.dp)
-                    .size(40.dp)
-                    .clickable { onObjectClick(obj) },
-                contentAlignment = Alignment.Center
-            ) {
-                val isSelected   = selectedId == obj.id
-                val onCooldown   = obj.isOnCooldown()
-                val markerColor  = if (onCooldown) EcoTextMuted else obj.rarity.color
-
-                // Пульсация Legendary
-                if (obj.rarity == Rarity.LEGENDARY && !onCooldown) {
+        // ── Эмодзи маркеры — отдельный Composable слой (поверх Canvas) ───────
+        if (mv != null) {
+            val t = tick
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            ecoObjects.forEach { obj ->
+                val scr = mv.geoToScreen(obj.lat, obj.lon)
+                if (scr != null) {
+                    val isSelected = selectedObject?.id == obj.id
+                    val boxSizeDp  = if (isSelected) 56.dp else 44.dp
+                    val boxSizePx  = with(density) { boxSizeDp.toPx() }
                     Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .background(markerColor.copy(alpha = pingAlpha * 0.15f), CircleShape)
-                            .border(1.dp, markerColor.copy(alpha = pingAlpha * 0.4f), CircleShape)
+                        Modifier
+                            .offset {
+                                IntOffset(
+                                    (scr.x - boxSizePx / 2).toInt(),
+                                    (scr.y - boxSizePx / 2).toInt()
+                                )
+                            }
+                            .size(boxSizeDp)
+                            .pointerInput(obj.id) {
+                                detectTapGestures {
+                                    selectedObject = if (selectedObject?.id == obj.id) null else obj
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(obj.emoji, fontSize = if (isSelected) 24.sp else 20.sp)
+                    }
+                }
+            }
+        }
+
+        // ── Top Bar ──────────────────────────────────────────────────────────
+        Column(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp)
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    Modifier.weight(1f)
+                        .background(Color(0xCC0D1A0D), RoundedCornerShape(14.dp))
+                        .border(1.dp, EcoBorder, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("🔍", fontSize = 13.sp)
+                    Text("Поиск объектов...", color = EcoTextMuted, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                }
+                MapTopBtn("⚙️") {}
+                MapTopBtn("📍") {
+                    mapViewRef?.controller?.animateTo(GeoPoint(userLat, userLng))
+                }
+            }
+        }
+
+        // ── Правые кнопки зума ────────────────────────────────────────────
+        Column(
+            Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MapTopBtn("+") { mapViewRef?.controller?.zoomIn() }
+            MapTopBtn("−") { mapViewRef?.controller?.zoomOut() }
+        }
+
+        // ── Диалог выбора сканирования ────────────────────────────────────
+        AnimatedVisibility(
+            visible = showScanChoice && selectedObject != null,
+            enter   = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit    = fadeOut() + scaleOut(targetScale = 0.92f)
+        ) {
+            selectedObject?.let { obj ->
+                ScanChoiceDialog(
+                    obj          = obj,
+                    onAutoScan   = { showScanChoice = false; onNavigateToScanner(obj, false) },
+                    onCameraScan = { showScanChoice = false; onNavigateToScanner(obj, true) },
+                    onDismiss    = { showScanChoice = false }
+                )
+            }
+        }
+
+        // ── Bottom ────────────────────────────────────────────────────────
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            AnimatedVisibility(
+                visible = selectedObject != null && !showScanChoice,
+                enter   = slideInVertically { it } + fadeIn(),
+                exit    = slideOutVertically { it } + fadeOut()
+            ) {
+                selectedObject?.let { obj ->
+                    val scannerCd = GameState.scannerCdRemaining()
+                    val plantCd   = GameState.plantCdRemaining(obj.id)
+                    val canScan   = scannerCd == 0L && plantCd == 0L
+                    val distM     = distanceM(userLat, userLng, obj.lat, obj.lon).toInt()
+
+                    SelectedObjectCard(
+                        obj         = obj,
+                        canScan     = canScan,
+                        scannerCdMs = scannerCd,
+                        plantCdMs   = plantCd,
+                        distM       = distM,
+                        onDismiss   = { selectedObject = null },
+                        onScan      = { showScanChoice = true }
                     )
                 }
-
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            markerColor.copy(alpha = if (isSelected) 0.3f else 0.15f),
-                            CircleShape
-                        )
-                        .border(
-                            width = if (isSelected) 2.dp else 1.dp,
-                            color = if (onCooldown) markerColor.copy(alpha = 0.4f) else markerColor,
-                            shape = CircleShape
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(obj.emoji, fontSize = if (onCooldown) 14.sp else 16.sp)
-                }
-
-                // КД значок
-                if (onCooldown) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(14.dp)
-                            .background(EcoRed.copy(alpha = 0.9f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) { Text("⏳", fontSize = 7.sp) }
-                }
             }
-        }
 
-        // Маркер игрока (центр)
-        Box(
-            modifier = Modifier
-                .offset(x = canvasW / 2 - 20.dp, y = canvasH / 2 - 20.dp)
-                .size(40.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(Modifier.size(60.dp).background(EcoBlue.copy(alpha = pingAlpha * 0.15f), CircleShape))
-            Box(Modifier.size(36.dp).background(EcoBlue.copy(alpha = pingAlpha * 0.1f), CircleShape))
-            Box(Modifier.size(12.dp).background(EcoBlue, CircleShape).border(2.dp, Color.White, CircleShape))
-        }
-    }
-}
-
-// ─── Stats Overlay ────────────────────────────────────────────────────────────
-
-@Composable
-fun MapStatsOverlay(total: Int, epic: Int, legendary: Int, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .background(EcoSurface.copy(alpha = 0.9f), RoundedCornerShape(10.dp))
-            .border(1.dp, EcoBorder, RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Text("$total", fontSize = 16.sp, fontWeight = FontWeight.Black, color = EcoGreen)
-        Text("объектов", fontSize = 7.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
-        if (epic > 0)
-            Text("$epic epic", fontSize = 8.sp, color = EcoPurple, fontFamily = FontFamily.Monospace)
-        if (legendary > 0)
-            Text("$legendary ★", fontSize = 8.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
-    }
-}
-
-// ─── Nearby Card ──────────────────────────────────────────────────────────────
-
-@Composable
-fun MapNearbyCard(
-    obj: MapObject,
-    userLat: Double,
-    userLon: Double,
-    onNavigate: (MapObject) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EcoSurface)
-            .border(1.dp, EcoBorder)
-            .padding(12.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(obj.emoji, fontSize = 28.sp)
-        Column(Modifier.weight(1f)) {
-            Text(obj.name, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
-            Text(
-                "📍 ${MapObjectsRepository.formatDistance(userLat, userLon, obj)} · ${obj.biome.label}",
-                fontSize = 9.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace
+            NearbyStrip(
+                objects    = ecoObjects.sortedBy { distanceM(userLat, userLng, it.lat, it.lon) }.take(8),
+                selectedId = selectedObject?.id,
+                userLat    = userLat,
+                userLng    = userLng,
+                onSelect   = { selectedObject = if (selectedObject?.id == it.id) null else it }
             )
         }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(
-                modifier = Modifier
-                    .background(obj.rarity.color.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
-                    .border(1.dp, obj.rarity.color.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+    }
+}
+
+// ─── Утилита ─────────────────────────────────────────────────────────────────
+
+private fun Offset.getDistance(): Float = kotlin.math.sqrt(x * x + y * y)
+
+// ─── Top Bar кнопка ───────────────────────────────────────────────────────────
+
+@Composable
+fun MapTopBtn(text: String, onClick: () -> Unit) {
+    Box(
+        Modifier.size(44.dp)
+            .background(Color(0xCC0D1A0D), RoundedCornerShape(12.dp))
+            .border(1.dp, EcoBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Text(text, fontSize = 18.sp, color = EcoTextPrimary) }
+}
+
+// ─── Диалог выбора ────────────────────────────────────────────────────────────
+
+@Composable
+fun ScanChoiceDialog(obj: MapObject, onAutoScan: () -> Unit, onCameraScan: () -> Unit, onDismiss: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            Modifier.fillMaxWidth().padding(28.dp).clickable(enabled = false) {},
+            shape  = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = EcoSurface),
+            border = BorderStroke(1.dp, obj.rarity.color.copy(alpha = 0.5f))
+        ) {
+            Column(
+                Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(obj.rarity.label, fontSize = 8.sp, color = obj.rarity.color,
-                    fontFamily = FontFamily.Monospace)
-            }
-            Button(
-                onClick        = { onNavigate(obj) },
-                modifier       = Modifier.height(28.dp),
-                shape          = RoundedCornerShape(8.dp),
-                colors         = ButtonDefaults.buttonColors(
-                    containerColor = EcoGreenDark,
-                    contentColor   = EcoBackground
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)
-            ) {
-                Text("→ Сканировать", fontSize = 9.sp, fontWeight = FontWeight.Black)
+                Text(obj.emoji, fontSize = 52.sp)
+                Text(obj.name, fontSize = 18.sp, fontWeight = FontWeight.Black, color = EcoTextPrimary, textAlign = TextAlign.Center)
+                Box(
+                    Modifier.background(obj.rarity.color.copy(.12f), RoundedCornerShape(8.dp))
+                        .border(1.dp, obj.rarity.color.copy(.35f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("★", fontSize = 9.sp, color = obj.rarity.color)
+                        Text(obj.rarity.label.uppercase(), fontSize = 9.sp, color = obj.rarity.color, fontFamily = FontFamily.Monospace)
+                    }
+                }
+                Box(Modifier.fillMaxWidth().height(1.dp).background(EcoBorder))
+                Text("Как сканировать?", fontSize = 11.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+
+                Button(
+                    onClick = onCameraScan,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = EcoGreenDark, contentColor = EcoBackground)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📷  Камера + Plant.id", fontSize = 14.sp, fontWeight = FontWeight.Black)
+                        Text("Сфотографируй растение → AI определит", fontSize = 9.sp, color = EcoBackground.copy(0.7f))
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = onAutoScan,
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, EcoBorder),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EcoTextPrimary)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⚡  Авто-скан", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Получить карточку без камеры", fontSize = 9.sp, color = EcoTextMuted)
+                    }
+                }
+
+                Text("+${obj.rarity.multiplier} ECO за скан", fontSize = 10.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
             }
         }
     }
 }
 
-// ─── Detail Card (при тапе на маркер) ────────────────────────────────────────
+// ─── Selected Object Card ─────────────────────────────────────────────────────
 
 @Composable
-fun MapObjectDetailCard(
-    obj: MapObject,
-    userLat: Double,
-    userLon: Double,
-    tick: Long,
-    onScan: (MapObject) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val inRange       = obj.isInRange(userLat, userLon)
-    val onCooldown    = obj.isOnCooldown()
-    val cdRemaining   = GameState.plantCdRemaining(obj.id)
-    val distStr       = MapObjectsRepository.formatDistance(userLat, userLon, obj)
+fun SelectedObjectCard(obj: MapObject, canScan: Boolean, scannerCdMs: Long, plantCdMs: Long,
+                       distM: Int, userLat: Double = 0.0, userLng: Double = 0.0,
+                       onDismiss: () -> Unit, onScan: () -> Unit) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+        shape  = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = EcoSurface),
+        border = BorderStroke(1.dp, obj.rarity.color.copy(alpha = 0.4f))
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(52.dp)
+                        .background(androidx.compose.ui.graphics.Brush.radialGradient(
+                            listOf(obj.rarity.color.copy(0.2f), Color.Transparent)), CircleShape)
+                        .border(1.dp, obj.rarity.color.copy(0.4f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) { Text(obj.emoji, fontSize = 28.sp) }
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(obj.name, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
+                    Spacer(Modifier.height(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        RarityChip(obj.rarity)
+                        Text("📍 ${distM}м", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
+                        Text("🪙 +${obj.rarity.multiplier}", fontSize = 10.sp, color = EcoGold, fontFamily = FontFamily.Monospace)
+                        Text(obj.biome.emoji, fontSize = 11.sp)
+                    }
+                }
+                Box(
+                    Modifier.size(28.dp).background(EcoSurface2, CircleShape).clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) { Text("✕", fontSize = 11.sp, color = EcoTextMuted) }
+            }
 
+            if (!canScan) {
+                Spacer(Modifier.height(10.dp))
+                val (icon, text, clr) = when {
+                    plantCdMs > 0 -> Triple("🔒", "Уже отсканировано · КД: ${GameState.formatCd(plantCdMs)}", EcoRed)
+                    else          -> Triple("⏳", "Сканер на перезарядке · ${GameState.formatCd(scannerCdMs)}", EcoGold)
+                }
+                Row(
+                    Modifier.fillMaxWidth()
+                        .background(clr.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                        .border(1.dp, clr.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(icon, fontSize = 14.sp)
+                    Text(text, fontSize = 10.sp, color = clr, fontFamily = FontFamily.Monospace)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onScan, enabled = canScan,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                shape    = RoundedCornerShape(14.dp),
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor = EcoGreenDark, contentColor = EcoBackground,
+                    disabledContainerColor = Color(0xFF1A2E1A), disabledContentColor = EcoTextMuted
+                )
+            ) {
+                Text(if (canScan) "📷  Сканировать" else "🔒  Недоступно", fontSize = 14.sp, fontWeight = FontWeight.Black)
+            }
+        }
+    }
+}
+
+@Composable
+fun RarityChip(rarity: Rarity) {
+    Box(
+        Modifier.background(rarity.color.copy(0.12f), RoundedCornerShape(6.dp))
+            .border(1.dp, rarity.color.copy(0.3f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 7.dp, vertical = 3.dp)
+    ) { Text(rarity.label, fontSize = 9.sp, color = rarity.color, fontFamily = FontFamily.Monospace) }
+}
+
+// ─── Nearby Strip ─────────────────────────────────────────────────────────────
+
+@Composable
+fun NearbyStrip(objects: List<MapObject>, selectedId: Int?, userLat: Double, userLng: Double, onSelect: (MapObject) -> Unit) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(EcoSurface)
-            .border(1.dp, obj.rarity.color.copy(alpha = 0.3f))
-            .padding(14.dp)
+        Modifier.fillMaxWidth()
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(
+                listOf(Color.Transparent, EcoBackground.copy(alpha = 0.97f))))
+            .padding(top = 10.dp, bottom = 4.dp)
     ) {
         Row(
-            modifier              = Modifier.fillMaxWidth(),
-            verticalAlignment     = Alignment.CenterVertically,
+            Modifier.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(obj.emoji, fontSize = 30.sp)
-                Column {
-                    Text(obj.name, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = EcoTextPrimary)
-                    Text("${obj.rarity.label} · ${obj.biome.emoji} ${obj.biome.label}",
-                        fontSize = 9.sp, color = obj.rarity.color, fontFamily = FontFamily.Monospace)
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("⚡", fontSize = 12.sp)
+                Text("Объекты рядом", fontSize = 11.sp, color = EcoGreen, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             }
-            Text("✕", modifier = Modifier.clickable(onClick = onDismiss),
-                fontSize = 18.sp, color = EcoTextMuted)
+            Text("${objects.size} найдено", fontSize = 10.sp, color = EcoTextMuted, fontFamily = FontFamily.Monospace)
         }
-
-        Spacer(Modifier.height(10.dp))
-
+        Spacer(Modifier.height(8.dp))
         Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment     = Alignment.CenterVertically
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("📍", fontSize = 14.sp)
-                Text(distStr, fontSize = 11.sp,
-                    color = if (inRange) EcoGreen else EcoTextMuted,
-                    fontFamily = FontFamily.Monospace)
-                if (inRange) {
-                    Box(
-                        modifier = Modifier
-                            .background(EcoGreen.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
-                            .border(1.dp, EcoGreen.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) { Text("В зоне", fontSize = 8.sp, color = EcoGreen, fontFamily = FontFamily.Monospace) }
-                }
-            }
-            Text("+${obj.rarity.multiplier} ECO",
-                fontSize = 12.sp, fontWeight = FontWeight.Bold, color = EcoGold)
-        }
-
-        if (onCooldown) {
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(EcoRed.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                    .border(1.dp, EcoRed.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                Text("🔒", fontSize = 14.sp)
-                Text("Уже отсканировано · КД: ${GameState.formatCd(cdRemaining)}",
-                    fontSize = 10.sp, color = EcoRed, fontFamily = FontFamily.Monospace)
+            objects.forEach { obj ->
+                val distM      = distanceM(userLat, userLng, obj.lat, obj.lon).toInt()
+                val onCd       = GameState.plantCdRemaining(obj.id) > 0
+                val isSelected = selectedId == obj.id
+                NearbyChip(obj, isSelected, distM, onCd) { onSelect(obj) }
             }
         }
+        Spacer(Modifier.height(6.dp))
+    }
+}
 
-        Spacer(Modifier.height(10.dp))
-
-        Button(
-            onClick  = { if (!onCooldown && inRange) onScan(obj) },
-            modifier = Modifier.fillMaxWidth().height(46.dp),
-            enabled  = !onCooldown && inRange,
-            shape    = RoundedCornerShape(12.dp),
-            colors   = ButtonDefaults.buttonColors(
-                containerColor         = EcoGreenDark,
-                contentColor           = EcoBackground,
-                disabledContainerColor = EcoGreenDim.copy(alpha = 0.3f),
-                disabledContentColor   = EcoTextMuted
-            )
-        ) {
+@Composable
+fun NearbyChip(obj: MapObject, isSelected: Boolean, distM: Int, onCooldown: Boolean, onSelect: () -> Unit) {
+    Row(
+        Modifier
+            .background(if (isSelected) obj.rarity.color.copy(0.14f) else Color(0xCC0D1A0D), RoundedCornerShape(14.dp))
+            .border(1.dp, if (isSelected) obj.rarity.color else EcoBorder, RoundedCornerShape(14.dp))
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box {
+            Text(obj.emoji, fontSize = 20.sp)
+            if (onCooldown) Box(
+                Modifier.size(12.dp).align(Alignment.BottomEnd).background(EcoSurface, CircleShape),
+                contentAlignment = Alignment.Center
+            ) { Text("🔒", fontSize = 7.sp) }
+        }
+        Column {
+            Text(obj.name.split(" ").first(), fontSize = 11.sp,
+                color = if (onCooldown) EcoTextMuted else EcoTextPrimary, fontWeight = FontWeight.SemiBold)
             Text(
-                when {
-                    onCooldown -> "🔒 Cooldown"
-                    !inRange   -> "📍 Подойди ближе (${obj.scanRadiusM}м)"
-                    else       -> "📷 Сканировать"
-                },
-                fontSize = 13.sp, fontWeight = FontWeight.Black
+                if (onCooldown) "КД ${GameState.formatCd(GameState.plantCdRemaining(obj.id))}"
+                else "${distM}м · ${obj.biome.emoji}",
+                fontSize = 9.sp,
+                color = if (onCooldown) EcoRed.copy(alpha = 0.7f) else EcoTextMuted,
+                fontFamily = FontFamily.Monospace
             )
         }
     }
