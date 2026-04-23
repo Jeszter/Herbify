@@ -1,0 +1,11 @@
+# local secrets — NEVER commit
+local.properties
+
+# Build outputs
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+*.iml
